@@ -342,8 +342,7 @@ const WEEKLY_TREND = [
   { label:"Min", pi:57.4 },
 ];
 
-// Password admin TIDAK disimpan di sini lagi — dicek di server lewat
-// POST /api/admin/login (lihat window.sagatama513AdminLoginHook di bawah).
+const ADMIN_PASSWORD = "sagatama513"; // ganti sesuai kebutuhan produksi
 
 let state = {
   view:"toko",
@@ -1085,20 +1084,15 @@ function attachEvents(){
   // ---- Admin login gate ----
   if(!state.adminLoggedIn){
     const passEl = document.getElementById("adminPass");
-    const doLogin = async ()=>{
+    const doLogin = ()=>{
       const val = passEl ? passEl.value : "";
-      const btn = document.getElementById("btnAdminLogin");
-      if(btn){ btn.disabled = true; btn.textContent = "Memeriksa..."; }
-      const ok = (typeof window.sagatama513AdminLoginHook === "function")
-        ? await window.sagatama513AdminLoginHook(val)
-        : false;
-      if(btn){ btn.disabled = false; btn.textContent = "Masuk Dashboard"; }
-      if(ok){
+      if(val === ADMIN_PASSWORD){
         state.adminLoggedIn = true;
         state.adminLoginErr = "";
         state.adminView = "dashboard";
+        if(typeof window.sagatama513AdminLoginHook === "function") window.sagatama513AdminLoginHook();
       } else {
-        state.adminLoginErr = "Kata sandi salah atau server admin tidak bisa dihubungi.";
+        state.adminLoginErr = "Kata sandi salah. Coba lagi.";
       }
       render();
     };
@@ -1290,8 +1284,8 @@ render();
      =================================================================== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { initializeFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Domain backend Sagatama Mart yang sesungguhnya (dipakai apa adanya, jadi
 // tetap berfungsi walau sagatama-513.html di-hosting di domain lain).
@@ -1307,7 +1301,7 @@ const firebaseConfig = {
     appId: "1:372845954028:web:189f2a3127ea8189b9f6c9"
 };
 
-const USE_SANDBOX = true; // WAJIB tetap sinkron dengan USE_SANDBOX di index.html
+const USE_SANDBOX = false; // WAJIB tetap sinkron dengan USE_SANDBOX di index.html — mainnet
 
 let app, auth, db;
 let sgtCurrentUser = null;
@@ -1412,34 +1406,6 @@ function restoreExistingSession() {
     return false;
 }
 
-// Sesi login bisa berasal dari SSO (localStorage 'sagatama_user' dipakai
-// bersama Sagatama Mart) yang mungkin dibuat TANPA scope 'payments'. Kalau
-// begitu, Pi.createPayment() akan gagal dgn "Cannot create a payment without
-// payments scope". Fungsi ini memastikan token yang dipakai untuk checkout
-// selalu punya scope tsb, minta ulang otomatis kalau perlu.
-async function ensurePaymentsScope513() {
-    if (sgtCurrentUser && sgtCurrentUser.hasPaymentsScope) return true;
-    if (!window.Pi) return false;
-    try {
-        const authResult = await window.Pi.authenticate(['username', 'payments'], () => {});
-        if (!authResult || !authResult.user) return false;
-        sgtCurrentUser = {
-            ...sgtCurrentUser,
-            uid: authResult.user.uid || (sgtCurrentUser && sgtCurrentUser.uid),
-            username: authResult.user.username || (sgtCurrentUser && sgtCurrentUser.username) || 'pioneer',
-            accessToken: authResult.accessToken,
-            walletAddress: authResult.user.wallet_address || (sgtCurrentUser && sgtCurrentUser.walletAddress) || null,
-            authType: 'pi',
-            hasPaymentsScope: true
-        };
-        localStorage.setItem('sagatama_user', JSON.stringify(sgtCurrentUser));
-        return true;
-    } catch (e) {
-        console.warn('[S513] gagal minta scope payments:', e.message);
-        return false;
-    }
-}
-
 async function loginWithPiSgt() {
     const btn = document.getElementById('btnPiLogin');
     const originalText = btn.textContent;
@@ -1468,8 +1434,7 @@ async function loginWithPiSgt() {
             role: 'buyer',
             accessToken: authResult.accessToken,
             walletAddress: authResult.user.wallet_address || null,
-            authType: 'pi',
-            hasPaymentsScope: true
+            authType: 'pi'
         };
         // Simpan dengan key yang SAMA dengan index.html supaya SSO
         // konsisten di kedua app kalau satu domain.
@@ -1488,6 +1453,29 @@ async function loginWithPiSgt() {
     }
 }
 
+// Memastikan sesi SDK Pi di halaman ini benar-benar sudah punya izin
+// scope "payments" aktif sebelum createPayment dipanggil. Session yang
+// di-restore dari localStorage (SSO) TIDAK otomatis membawa scope ini di
+// sesi SDK yang baru dimuat — makanya perlu re-authenticate di sini.
+async function ensurePiPaymentsScope() {
+    const scopes = ['username', 'payments'];
+    const onIncompletePaymentFound = () => {};
+    const authResult = await Promise.race([
+        window.Pi.authenticate(scopes, onIncompletePaymentFound),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout saat verifikasi izin pembayaran')), 30000))
+    ]);
+    if (!authResult || !authResult.user) throw new Error('Verifikasi izin pembayaran gagal');
+    sgtCurrentUser = {
+        ...sgtCurrentUser,
+        uid: authResult.user.uid || sgtCurrentUser.uid,
+        username: authResult.user.username || sgtCurrentUser.username,
+        accessToken: authResult.accessToken,
+        authType: 'pi'
+    };
+    localStorage.setItem('sagatama_user', JSON.stringify(sgtCurrentUser));
+    return true;
+}
+
 // ── SGT reward tiers (SAMA dengan index.html, supaya perhitungan bonus konsisten) ──
 const SGT_TIERS_513 = [
     { name:'Bronze',   min:0,    max:499,  rate:0.05 },
@@ -1499,30 +1487,24 @@ let sgtRatePerPi513 = 100;     // fallback — nilai resmi datang dari Firestore
 let sgtMinPurchase513 = 0.1;
 const SGT_FEE_RATE_513 = 0.03;
 
-// ── Admin: TIDAK ADA password/kredensial tersimpan di frontend lagi.
-// Password hanya dicek di server (env var ADMIN_PASSWORD). Kalau cocok,
-// server balas token bertanda-tangan (12 jam) yang dipakai untuk memanggil
-// /api/admin/set-rate dan /api/admin/distribute lewat header Authorization.
-let adminToken513 = null;
+// ── Admin: kredensial email Firebase SAMA dengan index.html, direkonstruksi
+// dari char codes (mengikuti pola yang sudah ada di index.html) supaya
+// tidak muncul sebagai plaintext polos di source, dan supaya UID admin
+// yang dipakai untuk menulis sgt_config/sgt_logs SAMA dengan Sagatama Mart.
+const ADMIN_EMAIL_513 = 'admin@portal-sagatama.pi';
+function _reconstructAdminPw513() {
+    return [65,100,109,105,110,53,49,51].map(c => String.fromCharCode(c)).join('');
+}
 
-async function requestAdminLogin513(password) {
+async function ensureAdminFirebaseAuth513() {
+    initFirebaseSgt();
     try {
-        const res = await fetch(SAGATAMA_API + '/api/admin/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password })
-        });
-        const data = await res.json();
-        if (data.success && data.token) {
-            adminToken513 = data.token;
-            window.SGT_ADMIN_STATUS_513 = 'Login admin server OK — perubahan akan tersimpan ke pusat.';
-            return true;
-        }
-        window.SGT_ADMIN_STATUS_513 = '⚠️ ' + (data.error || 'Login admin gagal.');
-        return false;
+        await signInWithEmailAndPassword(auth, ADMIN_EMAIL_513, _reconstructAdminPw513());
+        window.SGT_ADMIN_STATUS_513 = 'Login admin Firebase OK — perubahan akan tersimpan ke pusat.';
     } catch (e) {
-        window.SGT_ADMIN_STATUS_513 = '⚠️ Tidak bisa hubungi server admin: ' + e.message;
-        return false;
+        console.warn('[SGT admin] Email auth gagal, fallback anonymous:', e.message);
+        try { await signInAnonymously(auth); } catch (e2) {}
+        window.SGT_ADMIN_STATUS_513 = '⚠️ Login admin Firebase gagal (' + e.message + '). Simpan rate mungkin ditolak Firestore Rules — distribusi saldo tetap bisa jalan.';
     }
 }
 
@@ -1538,28 +1520,25 @@ async function loadSgtConfig513() {
     window.SGT_ADMIN_CONFIG_513 = { mintRate: sgtRatePerPi513, minPurchase: sgtMinPurchase513 };
 }
 
-// Dipanggil dari main script saat tombol "Masuk Dashboard" ditekan.
-// Mengembalikan true/false — main script yang memutuskan buka dashboard atau tidak.
-window.sagatama513AdminLoginHook = async function (password) {
-    const ok = await requestAdminLogin513(password);
-    if (ok) await loadSgtConfig513();
-    return ok;
+// Dipanggil dari main script begitu password admin lokal benar.
+window.sagatama513AdminLoginHook = async function () {
+    await ensureAdminFirebaseAuth513();
+    await loadSgtConfig513();
+    if (typeof window.render === 'function') window.render();
 };
 
-// Simpan rate mint — lewat backend (butuh token admin), server yang menulis
-// ke sgt_config/supply. Dokumen & field sama dengan yang dibaca Sagatama Mart.
+// Simpan rate mint — nulis ke sgt_config/supply, dokumen & field SAMA
+// dengan yang dibaca Sagatama Mart, jadi rate berlaku untuk keduanya.
 window.sagatama513SaveSgtRate = async function (rate, minPurchase) {
     if (!(rate > 0)) { window.toast513 && window.toast513('Rate tidak valid', 'error'); return; }
     if (!(minPurchase >= 0)) { window.toast513 && window.toast513('Minimum pembelian tidak valid', 'error'); return; }
-    if (!adminToken513) { window.toast513 && window.toast513('Sesi admin tidak valid, login ulang.', 'error'); return; }
     try {
-        const res = await fetch(SAGATAMA_API + '/api/admin/set-rate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken513 },
-            body: JSON.stringify({ mintRate: rate, minPurchase })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Gagal simpan rate');
+        await setDoc(doc(db, 'sgt_config', 'supply'), {
+            mintRate: rate,
+            minPurchase: minPurchase,
+            mintRateUpdatedAt: serverTimestamp(),
+            mintRateUpdatedBy: 'sagatama513_admin'
+        }, { merge: true });
         sgtRatePerPi513 = rate;
         sgtMinPurchase513 = minPurchase;
         window.SGT_ADMIN_CONFIG_513 = { mintRate: rate, minPurchase };
@@ -1569,21 +1548,46 @@ window.sagatama513SaveSgtRate = async function (rate, minPurchase) {
     }
 };
 
-// Distribusi manual SGT — lewat backend (butuh token admin). Browser tidak
-// lagi punya akses tulis langsung ke Firestore users/{uid} atau sgt_logs;
-// server yang mencari user via username, menambah saldo, dan mencatat log audit.
+// Distribusi manual SGT — cari user via username, tambah saldo langsung
+// (pola SAMA dengan distributeSGTManual() di index.html: jalur tulis
+// langsung ke Firestore users/{uid}, dipakai admin, bukan user Pi biasa
+// yang saldo-nya lewat /api/sgt/*). Dicatat ke sgt_logs untuk audit.
+// CATATAN: versi ini disederhanakan — tidak melakukan pengecekan hard-cap
+// suplai SGT seperti mintSGT() di index.html. Untuk distribusi besar,
+// tetap sebaiknya dilakukan lewat panel admin Sagatama Mart.
 window.sagatama513DistributeSgt = async function (username, amount) {
     if (!username) { window.toast513 && window.toast513('Isi username penerima', 'error'); return; }
     if (!(amount > 0)) { window.toast513 && window.toast513('Jumlah SGT tidak valid', 'error'); return; }
-    if (!adminToken513) { window.toast513 && window.toast513('Sesi admin tidak valid, login ulang.', 'error'); return; }
     try {
-        const res = await fetch(SAGATAMA_API + '/api/admin/distribute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken513 },
-            body: JSON.stringify({ username, amount })
+        const usersSnap = await getDocs(query(collection(db, 'users'), where('username', '==', username.toLowerCase()), limit(1)));
+        if (usersSnap.empty) { window.toast513 && window.toast513(`User @${username} tidak ditemukan`, 'error'); return; }
+
+        const userDoc = usersSnap.docs[0];
+        const userData = userDoc.data();
+        const targetUid = userData.uid || userDoc.id;
+        const currentBal = userData.sgtBalance || 0;
+        const currentTxs = Array.isArray(userData.sgtTransactions) ? userData.sgtTransactions : [];
+
+        const newTx = {
+            type: 'earn', amount,
+            description: 'Distribusi manual dari Admin (Sagatama-513)',
+            date: new Date().toISOString(),
+            userId: targetUid, adminId: 'sagatama513_admin'
+        };
+        await setDoc(doc(db, 'users', targetUid), {
+            username: username.toLowerCase(),
+            uid: targetUid,
+            sgtBalance: currentBal + amount,
+            sgtTransactions: [newTx, ...currentTxs].slice(0, 200),
+            sgtUpdatedAt: serverTimestamp(),
+            lastDistribution: { amount, admin: 'sagatama513_admin', timestamp: serverTimestamp() }
+        }, { merge: true });
+
+        await addDoc(collection(db, 'sgt_logs'), {
+            adminId: 'sagatama513_admin', targetUser: username.toLowerCase(),
+            targetUserId: targetUid, amount, type: 'manual_distribution',
+            description: 'Distribusi manual via Sagatama-513', timestamp: serverTimestamp()
         });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Gagal distribusi');
 
         window.toast513 && window.toast513(`✅ ${amount.toLocaleString('id-ID')} SGT terkirim ke @${username}`, 'success');
         const uEl = document.getElementById('sgtDistUser513'); if (uEl) uEl.value = '';
@@ -1606,21 +1610,21 @@ function estimateSgtReward513(piAmount){
     return Math.max(0, base + bonus - fee);
 }
 
-// Kirim paymentId (bukan angka reward) ke ledger pusat. Server yang mengambil
-// ulang data payment ini langsung dari Pi dan menghitung reward SGT-nya sendiri
-// — browser tidak bisa lagi mengklaim SGT dengan angka rekaan.
-async function syncSgtByPayment513(paymentId){
-    if (!sgtCurrentUser || !sgtCurrentUser.accessToken || !paymentId) return null;
+// Kirim delta SGT ke ledger pusat lewat backend (server yang memutuskan
+// nilai akhir — sama pola dengan saveSGTData()/awardSGT() di index.html
+// untuk user Pi asli). Kalau backend menolak/berbeda, pakai angka dari server.
+async function syncSgtDelta513(delta, txId){
+    if (!sgtCurrentUser || !sgtCurrentUser.accessToken || !delta) return null;
     try {
         const res = await fetch(SAGATAMA_API + '/api/sgt/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accessToken: sgtCurrentUser.accessToken, paymentId })
+            body: JSON.stringify({ accessToken: sgtCurrentUser.accessToken, delta, txId })
         });
         const data = await res.json();
         if (data && data.success) {
             sgtBalance = data.sgtBalance;
-            return data; // { sgtBalance, rewarded, alreadyCredited }
+            return data.sgtBalance;
         }
         console.warn('[SGT] sync gagal:', data && data.error);
     } catch (e) {
@@ -1654,9 +1658,13 @@ window.sagatama513Checkout = async function(items, totalPi) {
         setErr('Checkout hanya bisa dilakukan lewat Pi Browser.');
         return;
     }
-    const scopeOk = await ensurePaymentsScope513();
-    if (!scopeOk) {
-        setErr('Butuh izin pembayaran Pi yang belum diberikan. Coba tekan "Keluar" lalu masuk ulang dengan Pi, dan setujui izin pembayaran saat diminta.');
+
+    // WAJIB: pastikan scope "payments" aktif di sesi SDK saat ini, jangan
+    // hanya mengandalkan sgtCurrentUser hasil restore dari localStorage.
+    try {
+        await ensurePiPaymentsScope();
+    } catch (e) {
+        setErr('Gagal memverifikasi izin pembayaran Pi: ' + e.message + '. Coba tekan "Masuk dengan Pi" ulang.');
         return;
     }
 
@@ -1689,21 +1697,13 @@ window.sagatama513Checkout = async function(items, totalPi) {
         }, {
             onReadyForServerApproval: async (paymentId) => {
                 try {
-                    const r = await fetch(SAGATAMA_API + '/api/payments/approve', {
+                    await fetch(SAGATAMA_API + '/api/payments/approve', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ paymentId, network: USE_SANDBOX ? 'testnet' : 'mainnet' })
                     });
-                    const j = await r.json().catch(() => ({}));
-                    if (!r.ok || j.success === false) {
-                        throw new Error(j.error || `Server approve gagal (HTTP ${r.status})`);
-                    }
                 } catch (e) {
-                    console.error('[S513 checkout] approve GAGAL — Pi akan timeout menunggu approval:', e.message);
-                    if (typeof window.toast513 === 'function') {
-                        window.toast513('Pembayaran gagal disetujui server: ' + e.message, 'error');
-                    }
-                    resetBtn();
+                    console.warn('[S513 checkout] approve warning:', e.message);
                 }
             },
             onReadyForServerCompletion: async (paymentId, txid) => {
@@ -1741,16 +1741,15 @@ window.sagatama513Checkout = async function(items, totalPi) {
                     if (p) { p.stock = Math.max(0, p.stock - i.qty); p.sold = (p.sold || 0) + i.qty; }
                 });
 
-                // Bonus SGT — jumlah FINAL dihitung & diverifikasi sepenuhnya di server,
-                // yang mengambil ulang data payment ini langsung dari Pi. Nilai dari
-                // estimateSgtReward513() di bawah HANYA dipakai untuk tampilan sebelum
-                // checkout (lihat panel keranjang), tidak lagi dipakai untuk kredit saldo.
-                const syncResult = await syncSgtByPayment513(paymentId);
+                // Bonus SGT — dihitung lokal sebagai estimasi, nilai FINAL tetap
+                // ditentukan/diverifikasi server lewat /api/sgt/sync.
+                const estReward = estimateSgtReward513(totalPi);
+                const newBal = await syncSgtDelta513(estReward, 'sagatama513_' + orderId);
                 updateSgtUI();
 
                 if (typeof window.clearCart513AndRefresh === 'function') window.clearCart513AndRefresh();
                 if (typeof window.toast513 === 'function') {
-                    window.toast513('Pembayaran berhasil!' + (syncResult ? ` +${syncResult.rewarded.toLocaleString('id-ID')} SGT 🎉` : ' (SGT menyusul disinkronkan)'), 'success');
+                    window.toast513('Pembayaran berhasil!' + (newBal !== null ? ` +${estReward.toLocaleString('id-ID')} SGT 🎉` : ' (SGT menyusul disinkronkan)'), 'success');
                 }
                 document.getElementById('cartOverlay')?.classList.remove('open');
                 resetBtn();
