@@ -28,19 +28,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#1B1B16; --paper:#F6F1E4; --paperDim:#EDE6D3;
-    --marigold:#E2932F; --marigoldDeep:#B96E17;
-    --teal:#0F5C56; --tealDeep:#0A403C;
+    --ink:#15130E; --paper:#FBF7EE; --paperDim:#F1E9D5;
+    --marigold:#FF9A3C; --marigoldDeep:#E2760F;
+    --teal:#2A271E; --tealDeep:#0D0B07;
     --piColor:#7C4DFF; --piDeep:#5B32C7;
-    --line:#DCD2B4; --white:#FFFDF8;
-    --danger:#B4472A; --good:#4C7A55;
-    --sidebar:#14140F; --sidebarLine:#2A2A20;
+    --line:#E7DCC0; --white:#FFFFFF;
+    --danger:#C0442A; --good:#3F8452;
+    --sidebar:#121009; --sidebarLine:#2A2519;
+    --accentGrad: linear-gradient(135deg, #FFB259, #F2760F);
   }
+  html{ -webkit-text-size-adjust:100%; }
   *{ box-sizing:border-box; }
-  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; }
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; padding-bottom:0; overflow-x:hidden; }
   .disp{ font-family:'Space Grotesk',sans-serif; }
-  input:focus, select:focus, textarea:focus, button:focus-visible{ outline:2px solid var(--tealDeep); outline-offset:1px; }
-  button{ font-family:inherit; }
+  input:focus, select:focus, textarea:focus, button:focus-visible{ outline:2px solid var(--marigoldDeep); outline-offset:1px; }
+  button{ font-family:inherit; -webkit-tap-highlight-color:transparent; }
+  img, svg{ max-width:100%; }
+  @media (max-width:700px){
+    body{ padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px)); }
+    /* font-size 16px pada input mencegah Safari iOS otomatis zoom saat fokus */
+    input, select, textarea{ font-size:16px !important; }
+  }
 
   /* ===== SGT badge & wallet panel (koneksi ke portal-sagatama) ===== */
   .sgtBadge{ display:none; align-items:center; gap:8px; background:linear-gradient(135deg,#F59E0B,#D97706); color:#fff; border:none; border-radius:999px; padding:8px 14px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; box-shadow:0 2px 8px rgba(217,119,6,0.35); }
@@ -57,7 +65,7 @@
   .walletNote{ font-size:12.5px; color:#6B6553; margin-top:14px; line-height:1.5; background:var(--paperDim); border-radius:10px; padding:10px 12px; }
   .walletErr{ font-size:12.5px; color:var(--danger); margin-top:10px; }
 
-  .btnAddCart{ margin-top:10px; width:100%; background:var(--tealDeep); color:#fff; border:none; border-radius:10px; padding:9px; font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit; }
+  .btnAddCart{ margin-top:10px; width:100%; background:var(--ink); color:#fff; border:none; border-radius:10px; padding:9px; font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit; }
   .btnAddCart:disabled{ background:#B9B39C; cursor:not-allowed; }
   .cartStepper{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; background:var(--paperDim); border-radius:10px; padding:4px 6px; }
   .stepBtn{ width:28px; height:28px; border-radius:8px; border:none; background:var(--white); font-weight:700; font-size:15px; cursor:pointer; }
@@ -73,27 +81,59 @@
   .btnCheckoutPi{ margin-top:16px; width:100%; background:var(--piColor); color:#fff; border:none; border-radius:12px; padding:13px; font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; }
   .btnCheckoutPi:disabled{ opacity:0.55; cursor:wait; }
 
-  header{ border-bottom:1px solid var(--line); }
-  .headerWrap{ max-width:1120px; margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-  .brand{ display:flex; align-items:center; gap:10px; }
-  .brandTitle{ font-size:19px; font-weight:700; line-height:1; }
-  .brandSub{ font-size:12px; color:#6B6553; margin-top:2px; }
+  header{ background:var(--ink); border-bottom:1px solid var(--sidebarLine); position:sticky; top:0; z-index:40; }
+  .headerWrap{ max-width:1160px; margin:0 auto; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .brandTitle{ font-size:19px; font-weight:700; line-height:1; color:var(--white); }
+  .brandSub{ font-size:11.5px; color:#9C9584; margin-top:3px; max-width:280px; }
 
-  nav.tabs{ display:flex; gap:6px; background:var(--white); border:1px solid var(--line); border-radius:999px; padding:4px; }
-  nav.tabs button{ display:flex; align-items:center; gap:6px; padding:8px 16px; border-radius:999px; border:none; cursor:pointer; font-size:14px; font-weight:600; background:transparent; color:var(--ink); }
-  nav.tabs button.active{ background:var(--ink); color:var(--white); }
+  nav.tabs{ display:flex; gap:4px; background:rgba(255,255,255,0.06); border:1px solid var(--sidebarLine); border-radius:999px; padding:4px; }
+  nav.tabs button{ display:flex; align-items:center; gap:6px; padding:8px 16px; border-radius:999px; border:none; cursor:pointer; font-size:13.5px; font-weight:600; background:transparent; color:#C9C4AC; }
+  nav.tabs button.active{ background:var(--accentGrad); color:#1A1206; }
 
-  main{ max-width:1120px; margin:0 auto; padding:28px 20px 60px; }
+  .promoStrip{ background:linear-gradient(90deg, #1D1911, #26200F 50%, #1D1911); border-bottom:2px solid var(--marigoldDeep); padding:9px 20px; text-align:center; }
+  .promoStrip span{ color:var(--white); font-size:12.5px; font-weight:600; }
+  .promoStrip strong{ color:var(--marigold); }
 
-  .hero{ background:linear-gradient(135deg, var(--tealDeep), var(--teal)); border-radius:20px; padding:32px 28px; color:var(--white); display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; }
-  .heroLeft{ max-width:460px; }
-  .heroBadge{ display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.14); padding:5px 12px; border-radius:999px; font-size:12px; font-weight:600; margin-bottom:14px; }
+  @media (max-width:700px){
+    .headerWrap{ padding:12px 14px; gap:10px; flex-wrap:nowrap; }
+    nav.tabs{ display:none; } /* diganti bottom nav */
+    .cartIconBtn{ display:none; } /* diganti bottom nav */
+    .brandSub{ display:none; } /* hemat ruang di layar sempit */
+    .brandTitle{ font-size:16px; }
+    .btnPiLogin{ padding:7px 12px; font-size:12px; }
+    .sgtBadge{ padding:7px 10px; font-size:12px; }
+    .promoStrip{ padding:7px 12px; }
+    .promoStrip span{ font-size:11px; }
+  }
+  @media (max-width:360px){
+    .btnPiLogin{ padding:6px 9px; font-size:11px; }
+    .brandTitle{ font-size:14.5px; }
+    .headerWrap{ padding:10px 12px; }
+  }
+
+  main{ max-width:1160px; margin:0 auto; padding:24px 20px 60px; }
+  @media (max-width:700px){ main{ padding:18px 14px 40px; } }
+
+  .hero{ background:linear-gradient(120deg, var(--tealDeep) 0%, #1E1A10 55%, #3A2A0C 100%); border-radius:22px; padding:34px 30px; color:var(--white); display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; position:relative; overflow:hidden; border:1px solid #3A331F; }
+  .hero::after{ content:""; position:absolute; right:-60px; top:-60px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(255,154,60,0.28), transparent 70%); pointer-events:none; }
+  .heroLeft{ max-width:480px; position:relative; z-index:1; }
+  .heroBadge{ display:inline-flex; align-items:center; gap:6px; background:rgba(255,154,60,0.16); color:var(--marigold); border:1px solid rgba(255,154,60,0.35); padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; margin-bottom:14px; }
   .heroTitle{ font-size:32px; line-height:1.15; font-weight:700; margin:0; }
-  .heroDesc{ margin-top:12px; font-size:14.5px; color:rgba(255,255,255,0.85); }
-  .heroRate{ background:rgba(255,255,255,0.1); border-radius:14px; padding:16px 20px; min-width:200px; }
-  .heroRateLabel{ font-size:12px; color:rgba(255,255,255,0.75); }
-  .heroRateValue{ font-size:22px; font-weight:700; margin-top:4px; }
-  .heroRateNote{ font-size:11.5px; color:rgba(255,255,255,0.65); margin-top:6px; }
+  .heroDesc{ margin-top:12px; font-size:14.5px; color:rgba(255,255,255,0.75); }
+  .heroRate{ background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px 20px; min-width:200px; position:relative; z-index:1; }
+  .heroRateLabel{ font-size:12px; color:rgba(255,255,255,0.65); }
+  .heroRateValue{ font-size:22px; font-weight:700; margin-top:4px; color:var(--marigold); }
+  .heroRateNote{ font-size:11.5px; color:rgba(255,255,255,0.55); margin-top:6px; }
+
+  /* ---- Bottom mobile nav (Shopee-style tab bar) ---- */
+  .bottomNav{ display:none; }
+  @media (max-width:700px){
+    .bottomNav{ display:flex; position:fixed; bottom:0; left:0; right:0; z-index:50; background:var(--white); border-top:1px solid var(--line); padding:6px 4px calc(8px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -4px 14px rgba(0,0,0,0.06); }
+    .bottomNavBtn{ flex:1; min-height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:none; border:none; cursor:pointer; padding:6px 2px; color:#8A8368; font-size:10.5px; font-weight:600; font-family:inherit; }
+    .bottomNavBtn svg{ width:20px; height:20px; flex-shrink:0; }
+    .bottomNavBtn.active{ color:var(--marigoldDeep); }
+  }
 
   .toolsRow{ margin-top:28px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
   .searchBox{ position:relative; flex:1 1 240px; }
@@ -101,20 +141,22 @@
   .searchBox input{ width:100%; padding:10px 12px 10px 34px; border-radius:10px; border:1px solid var(--line); background:var(--white); font-size:14px; }
   .chips{ display:flex; gap:8px; flex-wrap:wrap; }
   .chip{ padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--line); background:var(--white); color:var(--ink); }
-  .chip.active{ background:var(--marigold); border-color:var(--marigoldDeep); color:var(--white); }
+  .chip.active{ background:var(--accentGrad); border-color:var(--marigoldDeep); color:#211605; }
 
   .grid{ margin-top:22px; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
   .empty{ grid-column:1/-1; padding:40px; text-align:center; color:#8A8368; }
-  .card{ background:var(--white); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .card{ background:var(--white); border:1px solid var(--line); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; transition:box-shadow .15s, transform .15s; }
+  .card:hover{ box-shadow:0 10px 24px rgba(20,16,8,0.1); transform:translateY(-2px); }
   .cardImg{ aspect-ratio:1.4/1; display:flex; align-items:center; justify-content:center; }
   .cardImg svg{ width:52%; height:52%; }
   .cardBody{ padding:14px 16px 16px; display:flex; flex-direction:column; gap:9px; }
-  .cardTop{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .cardTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
   .cardCat{ font-size:11px; color:#8A8368; }
-  .badgePremium{ font-size:11px; font-weight:600; color:var(--marigoldDeep); background:#FBEBD3; padding:3px 9px; border-radius:999px; }
-  .badgePremiumSm{ margin-left:8px; font-size:10.5px; font-weight:600; color:var(--marigoldDeep); background:#FBEBD3; padding:2px 7px; border-radius:999px; white-space:nowrap; }
+  .badgePremium{ font-size:11px; font-weight:700; color:#2A1D06; background:var(--accentGrad); padding:3px 9px; border-radius:999px; }
+  .badgePremiumSm{ margin-left:8px; font-size:10.5px; font-weight:700; color:#2A1D06; background:var(--accentGrad); padding:2px 7px; border-radius:999px; white-space:nowrap; }
+  .badgeHot{ font-size:10.5px; font-weight:700; color:#B4472A; background:#FCE8DE; padding:3px 8px; border-radius:999px; white-space:nowrap; }
   .cardName{ font-size:15px; font-weight:600; line-height:1.3; min-height:38px; }
-  .cardPricePi{ font-size:19px; font-weight:700; color:var(--piDeep); }
+  .cardPricePi{ font-size:19px; font-weight:800; color:var(--marigoldDeep); }
   .cardPriceRp{ font-size:12.5px; color:#6B6553; }
   .cardStock{ font-size:11.5px; }
 
@@ -125,7 +167,7 @@
   .panelTitle{ font-size:16px; font-weight:700; margin:0; }
   .panelDesc{ font-size:13px; color:#6B6553; margin-top:4px; max-width:640px; }
 
-  .btnPrimary{ display:inline-flex; align-items:center; gap:6px; background:var(--ink); color:var(--white); border:none; padding:9px 16px; border-radius:10px; font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btnPrimary{ display:inline-flex; align-items:center; gap:6px; background:var(--accentGrad); color:#211605; border:none; padding:9px 16px; border-radius:10px; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; box-shadow:0 4px 10px rgba(230,120,15,0.28); }
   .btnGhost{ display:inline-flex; align-items:center; gap:6px; background:var(--white); color:var(--ink); border:1px solid var(--line); padding:7px 12px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; }
   .btnDanger{ display:inline-flex; align-items:center; gap:6px; background:#FBEAE4; color:var(--danger); border:1px solid #E9C2B4; padding:7px 12px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; }
 
@@ -155,7 +197,8 @@
   td.cat{ color:#6B6553; }
   td.piInput input, td.stockInput input{ width:80px; padding:6px 8px; border-radius:8px; border:1px solid var(--line); font-size:13px; }
   td.rp{ font-weight:600; }
-  .tableWrap{ overflow-x:auto; margin-top:12px; }
+  .tableWrap{ overflow-x:auto; margin-top:12px; -webkit-overflow-scrolling:touch; }
+  .tableWrap table{ min-width:640px; }
   .rowThumb{ width:36px; height:36px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle; }
   .rowThumb svg{ width:60%; height:60%; }
   .rowActions{ display:flex; gap:6px; }
@@ -171,14 +214,14 @@
   .formField label{ font-size:12px; font-weight:600; color:#6B6553; display:block; margin-bottom:4px; }
   .formField input, .formField select{ width:100%; padding:9px 10px; border-radius:9px; border:1px solid var(--line); font-size:13.5px; background:var(--white); }
   .formCheck{ display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600; margin-top:24px; }
-  .formActions{ display:flex; gap:10px; margin-top:16px; }
+  .formActions{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
 
   .analyticsGrid{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
   @media (max-width:800px){ .analyticsGrid{ grid-template-columns:1fr; } }
   .barRow{ display:flex; align-items:center; gap:10px; margin-top:10px; }
   .barLabel{ font-size:12.5px; width:110px; flex-shrink:0; color:#4A4636; }
   .barTrack{ flex:1; height:10px; background:var(--paperDim); border-radius:999px; overflow:hidden; }
-  .barFill{ height:100%; background:linear-gradient(90deg, var(--teal), var(--tealDeep)); border-radius:999px; }
+  .barFill{ height:100%; background:var(--accentGrad); border-radius:999px; }
   .barValue{ font-size:12px; font-weight:600; width:80px; text-align:right; flex-shrink:0; }
 
   .topList{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
@@ -188,8 +231,17 @@
   .topSold{ font-size:11.5px; color:#8A8368; }
 
   @media (max-width:600px){
-    .heroTitle{ font-size:26px; }
+    .heroTitle{ font-size:24px; }
+    .hero{ padding:24px 20px; border-radius:18px; }
+    .heroRate{ width:100%; min-width:0; }
     .convGrid{ grid-template-columns:1fr; }
+    .grid{ grid-template-columns:repeat(2, 1fr); gap:10px; }
+    .cardBody{ padding:10px 11px 12px; gap:6px; }
+    .cardName{ font-size:13px; min-height:34px; }
+    .cardPricePi{ font-size:16px; }
+  }
+  @media (max-width:380px){
+    .grid{ grid-template-columns:1fr 1fr; gap:8px; }
   }
 
   /* ---------------- Admin dashboard (professional shell) ---------------- */
@@ -212,7 +264,7 @@
   .adminSideRole{ font-size:10.5px; color:#8F8A72; }
   .adminNavBtn{ width:100%; display:flex; align-items:center; gap:9px; padding:10px 10px; border-radius:10px; border:none; background:transparent; color:#C9C4AC; font-size:13px; font-weight:600; cursor:pointer; text-align:left; margin-bottom:2px; }
   .adminNavBtn:hover{ background:#1E1E15; }
-  .adminNavBtn.active{ background:var(--marigold); color:var(--ink); }
+  .adminNavBtn.active{ background:var(--accentGrad); color:#211605; }
   .adminNavBtn .navBadge{ margin-left:auto; background:var(--danger); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px; }
   .adminNavDivider{ height:1px; background:var(--sidebarLine); margin:10px 4px; }
   .adminLogoutBtn{ width:100%; display:flex; align-items:center; gap:9px; padding:10px 10px; border-radius:10px; border:none; background:transparent; color:#D98B7A; font-size:12.5px; font-weight:600; cursor:pointer; text-align:left; }
@@ -270,6 +322,10 @@
   </div>
 </header>
 
+<div class="promoStrip">
+  <span>🔥 <strong>Sagatama-513</strong> — belanja harian sampai barang mewah, semua dibayar penuh pakai <strong>Pi</strong>, tanpa perantara mata uang lain.</span>
+</div>
+
 <div class="walletOverlay" id="cartOverlay">
   <div class="cartDrawer" id="cartDrawerInner"></div>
 </div>
@@ -295,6 +351,25 @@
 </div>
 
 <main id="app"></main>
+
+<nav class="bottomNav" id="bottomNav">
+  <button class="bottomNavBtn" id="bnToko" data-bn="toko">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/></svg>
+    <span>Beranda</span>
+  </button>
+  <button class="bottomNavBtn" id="bnCart" data-bn="cart">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    <span>Keranjang</span>
+  </button>
+  <button class="bottomNavBtn" id="bnWallet" data-bn="wallet">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+    <span>Dompet</span>
+  </button>
+  <button class="bottomNavBtn" id="bnAdmin" data-bn="admin">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+    <span>Admin</span>
+  </button>
+</nav>
 
 <script>
 // ---------------------------------------------------------------------------
@@ -554,6 +629,8 @@ function renderLogo(){
 function render(){
   document.getElementById("tabToko").classList.toggle("active", state.view==="toko");
   document.getElementById("tabAdmin").classList.toggle("active", state.view==="admin");
+  document.getElementById("bnToko")?.classList.toggle("active", state.view==="toko");
+  document.getElementById("bnAdmin")?.classList.toggle("active", state.view==="admin");
   const app = document.getElementById("app");
   if(state.view==="toko"){
     app.innerHTML = renderToko();
@@ -874,7 +951,10 @@ function renderToko(){
       <div class="cardBody">
         <div class="cardTop">
           <span class="cardCat">${esc(p.cat)}</span>
-          ${p.premium ? '<span class="badgePremium">Premium</span>' : ''}
+          <span style="display:flex; gap:5px;">
+            ${(p.sold||0)>150 ? '<span class="badgeHot">🔥 Laris</span>' : ''}
+            ${p.premium ? '<span class="badgePremium">Premium</span>' : ''}
+          </span>
         </div>
         <div class="cardName">${esc(p.name)}</div>
         <div>
@@ -1267,6 +1347,12 @@ function attachEvents(){
 
 document.getElementById("tabToko").addEventListener("click", ()=>{ state.view="toko"; render(); });
 document.getElementById("tabAdmin").addEventListener("click", ()=>{ state.view="admin"; render(); });
+
+// ---- Bottom mobile nav: proxy taps ke tombol header yang sudah ada ----
+document.getElementById("bnToko").addEventListener("click", ()=>{ document.getElementById("tabToko").click(); });
+document.getElementById("bnAdmin").addEventListener("click", ()=>{ document.getElementById("tabAdmin").click(); });
+document.getElementById("bnCart").addEventListener("click", ()=>{ document.getElementById("cartIconBtn").click(); });
+document.getElementById("bnWallet").addEventListener("click", ()=>{ document.getElementById("sgtBadge").click(); });
 
 render();
 </script>
