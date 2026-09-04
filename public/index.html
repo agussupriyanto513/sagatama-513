@@ -1412,6 +1412,34 @@ function restoreExistingSession() {
     return false;
 }
 
+// Sesi login bisa berasal dari SSO (localStorage 'sagatama_user' dipakai
+// bersama Sagatama Mart) yang mungkin dibuat TANPA scope 'payments'. Kalau
+// begitu, Pi.createPayment() akan gagal dgn "Cannot create a payment without
+// payments scope". Fungsi ini memastikan token yang dipakai untuk checkout
+// selalu punya scope tsb, minta ulang otomatis kalau perlu.
+async function ensurePaymentsScope513() {
+    if (sgtCurrentUser && sgtCurrentUser.hasPaymentsScope) return true;
+    if (!window.Pi) return false;
+    try {
+        const authResult = await window.Pi.authenticate(['username', 'payments'], () => {});
+        if (!authResult || !authResult.user) return false;
+        sgtCurrentUser = {
+            ...sgtCurrentUser,
+            uid: authResult.user.uid || (sgtCurrentUser && sgtCurrentUser.uid),
+            username: authResult.user.username || (sgtCurrentUser && sgtCurrentUser.username) || 'pioneer',
+            accessToken: authResult.accessToken,
+            walletAddress: authResult.user.wallet_address || (sgtCurrentUser && sgtCurrentUser.walletAddress) || null,
+            authType: 'pi',
+            hasPaymentsScope: true
+        };
+        localStorage.setItem('sagatama_user', JSON.stringify(sgtCurrentUser));
+        return true;
+    } catch (e) {
+        console.warn('[S513] gagal minta scope payments:', e.message);
+        return false;
+    }
+}
+
 async function loginWithPiSgt() {
     const btn = document.getElementById('btnPiLogin');
     const originalText = btn.textContent;
@@ -1440,7 +1468,8 @@ async function loginWithPiSgt() {
             role: 'buyer',
             accessToken: authResult.accessToken,
             walletAddress: authResult.user.wallet_address || null,
-            authType: 'pi'
+            authType: 'pi',
+            hasPaymentsScope: true
         };
         // Simpan dengan key yang SAMA dengan index.html supaya SSO
         // konsisten di kedua app kalau satu domain.
@@ -1623,6 +1652,11 @@ window.sagatama513Checkout = async function(items, totalPi) {
     const ready = await initPiSDKSgt();
     if (!ready || !window.Pi) {
         setErr('Checkout hanya bisa dilakukan lewat Pi Browser.');
+        return;
+    }
+    const scopeOk = await ensurePaymentsScope513();
+    if (!scopeOk) {
+        setErr('Butuh izin pembayaran Pi yang belum diberikan. Coba tekan "Keluar" lalu masuk ulang dengan Pi, dan setujui izin pembayaran saat diminta.');
         return;
     }
 
