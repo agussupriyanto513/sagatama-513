@@ -1287,9 +1287,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { initializeFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-// Domain backend Sagatama Mart yang sesungguhnya (dipakai apa adanya, jadi
-// tetap berfungsi walau sagatama-513.html di-hosting di domain lain).
+// SGT adalah token bersama satu ledger dengan Sagatama Mart, jadi saldo &
+// sync SGT tetap manggil backend Mart.
 const SAGATAMA_API = "https://sagatama-mart.vercel.app";
+// Pi Network payment (approve/complete) diproses MANDIRI oleh backend
+// sagatama-513 sendiri (folder api/payments/ di repo ini) — bukan numpang
+// ke Mart. Pakai path relatif supaya otomatis ikut domain tempat file ini
+// di-deploy (sagatama-513.vercel.app).
+const PI_PAYMENT_API = "";
 
 // Config SAMA dengan index.html — satu project Firebase = satu "pusat"
 const firebaseConfig = {
@@ -1301,7 +1306,7 @@ const firebaseConfig = {
     appId: "1:372845954028:web:189f2a3127ea8189b9f6c9"
 };
 
-const USE_SANDBOX = false; // WAJIB tetap sinkron dengan USE_SANDBOX di index.html — mainnet
+const USE_SANDBOX = true; // TESTNET — uji coba dulu sebelum balik ke mainnet (USE_SANDBOX = false)
 
 let app, auth, db;
 let sgtCurrentUser = null;
@@ -1697,7 +1702,7 @@ window.sagatama513Checkout = async function(items, totalPi) {
         }, {
             onReadyForServerApproval: async (paymentId) => {
                 try {
-                    await fetch(SAGATAMA_API + '/api/payments/approve', {
+                    await fetch(PI_PAYMENT_API + '/api/payments/approve', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ paymentId, network: USE_SANDBOX ? 'testnet' : 'mainnet' })
@@ -1708,7 +1713,7 @@ window.sagatama513Checkout = async function(items, totalPi) {
             },
             onReadyForServerCompletion: async (paymentId, txid) => {
                 try {
-                    await fetch(SAGATAMA_API + '/api/payments/complete', {
+                    await fetch(PI_PAYMENT_API + '/api/payments/complete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ paymentId, txid, network: USE_SANDBOX ? 'testnet' : 'mainnet' })
