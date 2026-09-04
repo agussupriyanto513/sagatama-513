@@ -1,0 +1,10 @@
+{
+  "name": "sagatama-513-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API pendukung Pi Network payments & token SGT untuk Sagatama-513",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
