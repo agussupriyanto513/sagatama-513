@@ -406,10 +406,6 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
     <span>Dompet</span>
   </button>
-  <button class="bottomNavBtn" id="bnAdmin" data-bn="admin">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
-    <span>Admin</span>
-  </button>
 </nav>
 
 <script>
@@ -1814,7 +1810,7 @@ function attachEvents(){
 
 // ---- Bottom mobile nav: sekarang jadi satu-satunya navigasi Toko/Admin ----
 document.getElementById("bnToko").addEventListener("click", ()=>{ state.view="toko"; render(); });
-document.getElementById("bnAdmin").addEventListener("click", ()=>{ state.view="admin"; render(); });
+document.getElementById("bnAdmin")?.addEventListener("click", ()=>{ state.view="admin"; render(); });
 document.getElementById("bnCart").addEventListener("click", ()=>{ document.getElementById("cartIconBtn").click(); });
 document.getElementById("bnWallet").addEventListener("click", ()=>{ document.getElementById("sgtBadge").click(); });
 
