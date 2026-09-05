@@ -564,7 +564,8 @@ function catTile(cat){
 }
 const LIGHT_TILES = ["#EFE3C8","#E8D9BE","#EDE3F5","#DCE8E6","#F3DEDA","#E7E0CB","#E4ECD8","#E2E6F0"];
 function catTileLight(cat){
-  let h=0; for(let i=0;i<cat.length;i++) h = (h*31 + cat.charCodeAt(i)) >>> 0;
+  const s = (cat==null) ? "" : String(cat); // jaga-jaga kalau data produk (mis. dari server) tidak punya kategori
+  let h=0; for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
   return LIGHT_TILES[h % LIGHT_TILES.length];
 }
 
@@ -679,12 +680,33 @@ function render(){
   // "Kelola Produk" & "Keluar" di sidebar saat layar pendek (mis. laptop).
   document.getElementById("bottomNav")?.classList.toggle("isHidden", state.view==="admin" && state.adminLoggedIn);
   const app = document.getElementById("app");
-  if(state.view==="toko"){
-    app.innerHTML = renderToko();
-  } else if(!state.adminLoggedIn){
-    app.innerHTML = renderAdminLogin();
-  } else {
-    app.innerHTML = renderAdminShell();
+  try{
+    if(state.view==="toko"){
+      app.innerHTML = renderToko();
+    } else if(!state.adminLoggedIn){
+      app.innerHTML = renderAdminLogin();
+    } else {
+      app.innerHTML = renderAdminShell();
+    }
+  } catch(e){
+    // Kalau ada bug/data tak terduga bikin satu halaman gagal dibangun,
+    // jangan biarkan layar "diam" dengan tampilan lama & menu yang seperti
+    // tidak merespons — tampilkan pesan jelas + tombol untuk kembali,
+    // supaya attachEvents() di bawah tetap bisa mengikat ulang klik menu.
+    console.error("[render] Gagal menampilkan halaman:", e);
+    app.innerHTML = `
+      <div class="adminLoginWrap">
+        <div class="adminLoginTitle disp">Halaman gagal dimuat</div>
+        <div class="adminLoginDesc">Terjadi kesalahan saat menampilkan halaman ini. Coba kembali ke Dashboard.</div>
+        <button class="btnPrimary adminLoginBtn" id="btnRenderErrorHome" style="margin-top:14px">Kembali ke Dashboard</button>
+      </div>
+    `;
+    document.getElementById("btnRenderErrorHome")?.addEventListener("click", ()=>{
+      state.adminView = "dashboard";
+      state.formOpen = false;
+      state.editingId = null;
+      render();
+    });
   }
   attachEvents();
 }
