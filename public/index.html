@@ -1786,20 +1786,12 @@ function attachEvents(){
       const origLabel = saveBtn.textContent;
       saveBtn.disabled = true;
 
-      // Kalau foto baru dipilih (masih data URL, belum diupload), upload ke
-      // Firebase Storage dulu dan pakai URL hasil uploadnya.
-      if(state.formImageChanged && image && image.startsWith("data:")){
-        saveBtn.textContent = "Mengunggah foto...";
-        try{
-          const blob = await (await fetch(image)).blob();
-          image = await window.SgtProducts.uploadProductImage(id, blob);
-        }catch(e){
-          alert("Gagal mengunggah foto ke server: " + e.message + "\nProduk tidak disimpan, coba lagi.");
-          saveBtn.disabled = false;
-          saveBtn.textContent = origLabel;
-          return;
-        }
-      }
+      // Sama seperti Sagatama Mart: foto TIDAK diupload ke Firebase Storage
+      // sama sekali. Foto sudah dikompres jadi data URL (base64) sewaktu
+      // dipilih (lihat compressImageFile di atas) — data URL itu langsung
+      // dipakai sebagai field "image" dan disimpan bareng dokumen produk
+      // di Firestore. Ini menghindari ketergantungan pada Storage Rules
+      // yang terpisah (dan pernah jadi penyebab foto gagal tersimpan).
 
       const productData = { id, name, cat, icon, pi, stock, premium, image, sold: 0 };
 
@@ -1926,13 +1918,10 @@ async function loadProductsFromFirestore() {
     }
 }
 
-async function uploadProductImage(id, blobOrFile) {
-    initFirebaseSgt();
-    const path = `products/${id}.jpg`;
-    const sRef = storageRef(storage, path);
-    await uploadBytes(sRef, blobOrFile, { contentType: 'image/jpeg' });
-    return await getDownloadURL(sRef);
-}
+// Catatan: sengaja TIDAK ada lagi fungsi upload foto ke Firebase Storage di
+// sini. Sama seperti Sagatama Mart, foto produk disimpan sebagai data URL
+// (base64) langsung di field "image" dokumen Firestore-nya — lihat alur
+// simpan produk di renderProductForm/btnSaveProduct di atas.
 
 async function saveProductToFirestore(product) {
     initFirebaseSgt();
@@ -1943,13 +1932,9 @@ async function saveProductToFirestore(product) {
 async function deleteProductFromFirestore(id) {
     initFirebaseSgt();
     try { await deleteDoc(doc(db, 'products', String(id))); } catch (e) { console.warn('[SGT] Gagal hapus produk di Firestore:', e.message); }
-    try {
-        if (!storage) storage = getStorage(app);
-        await deleteObject(storageRef(storage, `products/${id}.jpg`));
-    } catch (e) { /* wajar jika produk memang tidak punya foto */ }
 }
 
-window.SgtProducts = { loadProductsFromFirestore, uploadProductImage, saveProductToFirestore, deleteProductFromFirestore };
+window.SgtProducts = { loadProductsFromFirestore, saveProductToFirestore, deleteProductFromFirestore };
 
 async function initPiSDKSgt() {
     if (piInitPromise) return piInitPromise;
