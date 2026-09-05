@@ -1231,24 +1231,34 @@ function attachEvents(){
     render();
     const el = document.getElementById("rpInput"); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
   });
+  // 🔧 FIX: dulu tiap keystroke di sini manggil render() -> hancurkan &
+  // bangun ulang SELURUH halaman admin + re-bind semua event listener dari
+  // nol. Dengan banyak produk di tabel, ini bikin klik ke tombol lain
+  // (mis. tab "Kelola Produk", tombol Simpan) kadang jatuh ke elemen DOM
+  // yang baru saja dihapus saat render ulang lagi berlangsung -> tombol
+  // terasa "kadang bisa kadang tidak". Sekarang: cukup update data di
+  // memori PRODUCTS + sel yang bergantung (kolom Rupiah), TANPA render()
+  // ulang seluruh halaman. Baru render() penuh dipanggil saat form
+  // Simpan/Batal/Tambah/Hapus produk ditekan (perubahan struktur nyata).
   document.querySelectorAll("td.piInput input").forEach(inp=>{
     inp.addEventListener("input", e=>{
       const id = Number(inp.dataset.id);
       const val = Math.max(0, Number(e.target.value)||0);
-      PRODUCTS = PRODUCTS.map(p => p.id===id ? {...p, pi:val} : p);
-      render();
-      const el = document.querySelector(`td.piInput input[data-id="${id}"]`);
-      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      const prod = PRODUCTS.find(p=>p.id===id);
+      if(prod) prod.pi = val;
+      const row = inp.closest("tr");
+      const rpCell = row?.querySelector("td.rp");
+      if(rpCell) rpCell.textContent = formatRp(val*state.rate);
     });
   });
   document.querySelectorAll("td.stockInput input").forEach(inp=>{
     inp.addEventListener("input", e=>{
       const id = Number(inp.dataset.stockid);
       const val = Math.max(0, Math.round(Number(e.target.value)||0));
-      PRODUCTS = PRODUCTS.map(p => p.id===id ? {...p, stock:val} : p);
-      render();
-      const el = document.querySelector(`td.stockInput input[data-stockid="${id}"]`);
-      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      const prod = PRODUCTS.find(p=>p.id===id);
+      if(prod) prod.stock = val;
+      // Tidak ada kolom lain di tabel ini yang bergantung pada stok,
+      // jadi cukup update data di memori tanpa sentuh DOM lain.
     });
   });
   document.querySelectorAll("[data-editid]").forEach(btn=>{
