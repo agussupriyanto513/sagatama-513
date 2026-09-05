@@ -285,6 +285,37 @@
   .miniBadge.ok{ background:#E3EFE2; color:var(--good); }
   .miniBadge.warn{ background:#FBEAE4; color:var(--danger); }
 
+  /* ===== Orders & SGT Sosial (admin) ===== */
+  .statusPill{ display:inline-block; font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  .statusPill.pending{ background:#FBEAE4; color:var(--danger); }
+  .statusPill.paid{ background:#FEF3C7; color:#92400E; }
+  .statusPill.processing{ background:#DBEAFE; color:#1E40AF; }
+  .statusPill.shipped{ background:#E0E7FF; color:#3730A3; }
+  .statusPill.completed{ background:#E3EFE2; color:var(--good); }
+  .statusPill.approved{ background:#E3EFE2; color:var(--good); }
+  .statusPill.rejected{ background:#FBEAE4; color:var(--danger); }
+  .orderCard{ background:var(--white); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
+  .orderCardTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+  .orderItemsList{ font-size:12px; color:#6B6553; background:var(--paperDim); border-radius:10px; padding:8px 10px; margin-bottom:10px; }
+  .orderActions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .btnGhostSm, .btnDangerSm, .btnGoodSm{ border:none; border-radius:8px; padding:7px 12px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:5px; }
+  .btnGhostSm{ background:var(--paperDim); color:var(--ink); }
+  .btnDangerSm{ background:var(--danger); color:#fff; }
+  .btnGoodSm{ background:var(--good); color:#fff; }
+
+  .tabSosial{ display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:2px; }
+  .tabSosial button{ flex-shrink:0; background:var(--paperDim); border:none; padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:700; color:#6B6553; cursor:pointer; font-family:inherit; }
+  .tabSosial button.active{ background:var(--accentGrad); color:#211605; }
+
+  .sosialCard{ background:var(--white); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
+  .sosialEmpty{ text-align:center; padding:26px 10px; color:#9C9578; font-size:12.5px; }
+  .stakingRow{ display:flex; justify-content:space-between; align-items:center; background:var(--white); border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:8px; }
+  .tierBadgeSm{ display:inline-block; font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; }
+  .tierBadgeSm.Bronze{ background:#F1E0C7; color:#7A4E14; }
+  .tierBadgeSm.Silver{ background:#E4E4E4; color:#4B4B4B; }
+  .tierBadgeSm.Gold{ background:#FCEBB8; color:#8A6200; }
+  .tierBadgeSm.Platinum{ background:#DDEAE1; color:#1F5C43; }
+
   @media (max-width:820px){
     .adminShell{ flex-direction:column; }
     .adminSidebar{ width:100%; position:static; display:flex; align-items:center; gap:4px; overflow-x:auto; padding:10px; }
@@ -345,6 +376,22 @@
       Belanja &amp; checkout di Sagatama-513 sekarang memberi bonus SGT otomatis (dibayar via Pi Network, bonus disinkronkan &amp; diverifikasi lewat server yang sama).
     </div>
     <div class="walletErr" id="walletErr"></div>
+    <button id="btnOpenSosial513" style="width:100%; margin-top:14px; background:var(--paperDim); color:var(--ink); border:none; border-radius:12px; padding:12px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit;">🤝 Beasiswa, Bantuan Sosial &amp; Staking SGT</button>
+  </div>
+</div>
+
+<div class="walletOverlay" id="sosialOverlay">
+  <div class="walletCard" style="max-width:420px; max-height:82vh; overflow-y:auto;">
+    <div class="walletHead">
+      <div class="brandTitle disp" style="font-size:16px;">SGT Sosial</div>
+      <button class="walletClose" id="sosialClose">✕</button>
+    </div>
+    <div class="tabSosial" style="margin:12px 0;">
+      <button class="active" id="sosialTabBeasiswa" data-usosial="beasiswa">Beasiswa</button>
+      <button id="sosialTabBansos" data-usosial="bansos">Bantuan Sosial</button>
+      <button id="sosialTabStaking" data-usosial="staking">Staking</button>
+    </div>
+    <div id="sosialBody513"></div>
   </div>
 </div>
 
@@ -418,7 +465,9 @@ const WEEKLY_TREND = [
 const ADMIN_PASSWORD = "sagatama513"; // ganti sesuai kebutuhan produksi
 
 let state = {
-  view:"toko",
+  // ?admin=1 di URL langsung membuka tab Admin (tetap wajib password —
+  // ini cuma jalan pintas navigasi, bukan bypass otentikasi).
+  view: (new URLSearchParams(location.search).get("admin") === "1") ? "admin" : "toko",
   rate:4250000,
   category:"Semua",
   query:"",
@@ -428,7 +477,9 @@ let state = {
   editingId:null,
   adminLoggedIn:false,
   adminLoginErr:"",
-  adminView:"dashboard", // dashboard | products | analytics | settings
+  adminView:"dashboard", // dashboard | products | orders | analytics | settings | sgt | sgtsosial
+  ordersFilter:"all", // all | pending | paid | processing | shipped | completed
+  sosialTab:"beasiswa", // beasiswa | bansos | staking | distribute
   formImage:null, // data URL foto produk yang sedang diedit/ditambah
   cart: JSON.parse(localStorage.getItem("sagatama513_cart") || "[]"), // [{id, qty}]
   cartOpen: false,
@@ -615,6 +666,10 @@ const lockIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" st
 const sgtIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 8h4a2 2 0 0 1 0 4H9m0 0h4a2 2 0 0 1 0 4H9m0-8v8"/></svg>';
 const backIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
 const uploadIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+const receiptIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h16v20l-3-2-2 2-2-2-2 2-2-2-2 2-3-2Z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/></svg>';
+const heartHandIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42Z"/></svg>';
+const checkIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const xIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
 // Logo resmi Sagatama-513 (emblem hijau-emas), disematkan sebagai data URI
 // supaya file tetap satu berkas tunggal, tanpa bergantung pada file luar.
@@ -664,19 +719,23 @@ function renderAdminShell(){
   const nav = [
     { id:"dashboard", label:"Dashboard", icon:homeIcon },
     { id:"products", label:"Kelola Produk", icon:boxIcon },
+    { id:"orders", label:"Kelola Pesanan", icon:receiptIcon, badge: pendingOrderCount513() },
     { id:"analytics", label:"Analitik", icon:chartIcon },
     { id:"settings", label:"Kurs & Konverter", icon:swapIcon },
     { id:"sgt", label:"SGT Token", icon:sgtIcon },
+    { id:"sgtsosial", label:"SGT Sosial", icon:heartHandIcon, badge: pendingSosialCount513() },
   ];
   const navBtns = nav.map(n => `
-    <button class="adminNavBtn ${state.adminView===n.id?'active':''}" data-nav="${n.id}">${n.icon}<span>${n.label}</span></button>
+    <button class="adminNavBtn ${state.adminView===n.id?'active':''}" data-nav="${n.id}">${n.icon}<span>${n.label}</span>${n.badge?`<span class="navBadge">${n.badge}</span>`:''}</button>
   `).join("");
 
   let body;
   if(state.adminView==="products") body = renderAdminProducts();
+  else if(state.adminView==="orders") body = renderAdminOrders();
   else if(state.adminView==="analytics") body = renderAdminAnalytics();
   else if(state.adminView==="settings") body = renderAdminSettings();
   else if(state.adminView==="sgt") body = renderAdminSGT();
+  else if(state.adminView==="sgtsosial") body = renderAdminSgtSosial();
   else body = renderAdminDashboard();
 
   return `
@@ -728,6 +787,11 @@ function renderAdminDashboard(){
         <div class="quickLabel">Kelola Produk</div>
         <div class="quickDesc">Tambah, ubah, hapus produk & stok</div>
       </div>
+      <div class="quickCard" data-nav="orders">
+        <div class="quickIcon">${receiptIcon}</div>
+        <div class="quickLabel">Kelola Pesanan</div>
+        <div class="quickDesc">Proses & lacak pesanan checkout Pi</div>
+      </div>
       <div class="quickCard" data-nav="analytics">
         <div class="quickIcon">${chartIcon}</div>
         <div class="quickLabel">Analitik</div>
@@ -737,6 +801,11 @@ function renderAdminDashboard(){
         <div class="quickIcon">${swapIcon}</div>
         <div class="quickLabel">Kurs & Konverter</div>
         <div class="quickDesc">Atur kurs π ⇄ Rupiah</div>
+      </div>
+      <div class="quickCard" data-nav="sgtsosial">
+        <div class="quickIcon">${heartHandIcon}</div>
+        <div class="quickLabel">SGT Sosial</div>
+        <div class="quickDesc">Beasiswa, Bansos & Staking</div>
       </div>
     </div>
   `;
@@ -888,6 +957,333 @@ function renderAdminSGT(){
   `;
 }
 
+
+// ===========================================================================
+// KELOLA PESANAN (Orders) — dibaca dari koleksi Firestore bersama 'orders'.
+// Hanya menampilkan order dengan source:'sagatama-513' (checkout toko ini),
+// TIDAK menyentuh/menampilkan order milik Sagatama Mart.
+// ===========================================================================
+let ORDERS_513 = null; // null = belum dimuat, [] = sudah dimuat & kosong
+
+function pendingOrderCount513(){
+  if(!ORDERS_513) return 0;
+  return ORDERS_513.filter(o => o.status==="paid").length;
+}
+
+const ORDER_STATUS_LABEL_513 = { pending:"Menunggu", paid:"Dibayar", processing:"Diproses", shipped:"Dikirim", completed:"Selesai", cancelled:"Dibatalkan" };
+const ORDER_STATUS_FLOW_513 = { paid:"processing", processing:"shipped", shipped:"completed" };
+const ORDER_STATUS_NEXT_LABEL_513 = { paid:"Proses Pesanan", processing:"Tandai Dikirim", shipped:"Tandai Selesai" };
+
+function renderAdminOrders(){
+  const tabs = [
+    { id:"all", label:"Semua" },
+    { id:"paid", label:"Dibayar" },
+    { id:"processing", label:"Diproses" },
+    { id:"shipped", label:"Dikirim" },
+    { id:"completed", label:"Selesai" },
+  ];
+  const tabBtns = tabs.map(t => `<button class="chip ${state.ordersFilter===t.id?'active':''}" data-orderfilter="${t.id}">${t.label}</button>`).join("");
+
+  let body;
+  if(ORDERS_513 === null){
+    body = `<div class="sosialEmpty">Memuat data pesanan…</div>`;
+  } else {
+    const list = state.ordersFilter==="all" ? ORDERS_513 : ORDERS_513.filter(o=>o.status===state.ordersFilter);
+    if(!list.length){
+      body = `<div class="sosialEmpty">${receiptIcon}<div style="margin-top:8px;">Tidak ada pesanan pada kategori ini</div></div>`;
+    } else {
+      body = list.map(o => {
+        const dt = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleString("id-ID",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "-";
+        const itemsTxt = (o.items||[]).map(i=>`${i.qty||i.jumlah||1}× ${esc(i.name||i.nama||('#'+i.id))}`).join(", ");
+        const nextStatus = ORDER_STATUS_FLOW_513[o.status];
+        return `
+        <div class="orderCard">
+          <div class="orderCardTop">
+            <div>
+              <div style="font-weight:700; font-size:13px;">${esc(o.orderId || o.paymentId || o.id)}</div>
+              <div style="font-size:11.5px; color:#8A8368; margin-top:2px;">@${esc(o.customer||"—")} · ${dt}</div>
+            </div>
+            <span class="statusPill ${o.status}">${ORDER_STATUS_LABEL_513[o.status]||o.status}</span>
+          </div>
+          <div class="orderItemsList">${itemsTxt || "(rincian item tidak tersedia)"}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="disp" style="font-weight:700;">${formatPi(o.amount||0)} <span style="font-size:11px; color:#8A8368; font-weight:500;">≈ ${formatRp((o.amount||0)*state.rate)}</span></div>
+            <div class="orderActions">
+              ${nextStatus ? `<button class="btnGoodSm" data-orderadvance="${o.id}" data-nextstatus="${nextStatus}">${checkIcon} ${ORDER_STATUS_NEXT_LABEL_513[o.status]}</button>` : ""}
+              ${o.status!=="completed" && o.status!=="cancelled" ? `<button class="btnDangerSm" data-ordercancel="${o.id}">${xIcon} Batalkan</button>` : ""}
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+    }
+  }
+
+  return `
+    <button class="adminBackBtn" data-nav="dashboard">${backIcon} Kembali</button>
+    <div class="adminTopbar">
+      <div>
+        <div class="adminTopbarTitle disp">Kelola Pesanan</div>
+        <div class="adminTopbarSub">Pesanan checkout Pi Network di Sagatama-513</div>
+      </div>
+    </div>
+    <section class="panel">
+      <div class="tab-container" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:14px;">${tabBtns}</div>
+      ${body}
+    </section>
+  `;
+}
+
+async function loadOrders513(){
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    if(!dbRef) return;
+    const { collection, query, where, orderBy, getDocs } = window.__fsRef513;
+    let snap;
+    try{
+      snap = await getDocs(query(collection(dbRef,"orders"), where("source","==","sagatama-513"), orderBy("createdAt","desc")));
+    }catch(e){
+      // Fallback tanpa orderBy kalau index composite belum ada di Firestore
+      snap = await getDocs(query(collection(dbRef,"orders"), where("source","==","sagatama-513")));
+    }
+    const arr = [];
+    snap.forEach(d => arr.push({ id:d.id, ...d.data() }));
+    arr.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
+    ORDERS_513 = arr;
+  }catch(e){
+    console.warn("[Admin] loadOrders513 error:", e.message);
+    ORDERS_513 = [];
+  }
+  render();
+}
+
+async function advanceOrderStatus513(id, nextStatus){
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { doc, updateDoc, serverTimestamp } = window.__fsRef513;
+    await updateDoc(doc(dbRef,"orders",id), { status: nextStatus, statusUpdatedAt: serverTimestamp() });
+    window.toast513 && window.toast513("Status pesanan diperbarui: "+(ORDER_STATUS_LABEL_513[nextStatus]||nextStatus), "success");
+    loadOrders513();
+  }catch(e){
+    window.toast513 && window.toast513("Gagal update status: "+e.message, "error");
+  }
+}
+
+async function cancelOrder513(id){
+  if(!confirm("Batalkan pesanan ini?")) return;
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { doc, updateDoc, serverTimestamp } = window.__fsRef513;
+    await updateDoc(doc(dbRef,"orders",id), { status:"cancelled", statusUpdatedAt: serverTimestamp() });
+    window.toast513 && window.toast513("Pesanan dibatalkan", "warning");
+    loadOrders513();
+  }catch(e){
+    window.toast513 && window.toast513("Gagal membatalkan: "+e.message, "error");
+  }
+}
+
+// ===========================================================================
+// SGT SOSIAL (Admin) — Beasiswa, Bantuan Sosial, Staking. Memakai koleksi
+// Firestore YANG SAMA dengan Sagatama Mart (satu ledger pusat 'portal-sagatama'):
+// beasiswa_applications, bansos_applications, sgt_stakings, sgt_config, sgt_logs.
+// Approve/reject di sini langsung berlaku juga terlihat di Sagatama Mart.
+// ===========================================================================
+let BEASISWA_APPS_513 = null;
+let BANSOS_APPS_513 = null;
+let STAKING_LIST_513 = null;
+let BAITUL_MAAL_513 = { dana:0, totalStaked:0, stakers:0 };
+
+function pendingSosialCount513(){
+  let n = 0;
+  if(BEASISWA_APPS_513) n += BEASISWA_APPS_513.filter(a=>a.status==="pending").length;
+  if(BANSOS_APPS_513) n += BANSOS_APPS_513.filter(a=>a.status==="pending").length;
+  return n;
+}
+
+function renderApplicationCard513(app, id, kind){
+  const isPending = app.status === "pending";
+  const sc = app.status === "approved" ? "approved" : app.status === "rejected" ? "rejected" : "pending";
+  const titleLine = kind==="beasiswa"
+    ? `${esc(app.nama)} · ${(app.tingkat||"").toUpperCase()} · ${esc(app.sekolah||"")}`
+    : `${esc(app.nama)} · ${esc(BANSOS_JENIS_LABEL_513[app.jenis]||app.jenis)}`;
+  const descLine = kind==="beasiswa" ? app.alasan : app.deskripsi;
+  const desc = { label: kind==="beasiswa"?"Beasiswa":"Bantuan Sosial: "+(BANSOS_JENIS_LABEL_513[app.jenis]||app.jenis) };
+  return `
+    <div class="sosialCard">
+      <div class="orderCardTop">
+        <div>
+          <div style="font-weight:700; font-size:13px;">${titleLine}</div>
+          <div style="font-size:11.5px; color:#8A8368; margin-top:2px;">@${esc(app.username||"—")}</div>
+        </div>
+        <span class="statusPill ${sc}">${ORDER_STATUS_LABEL_513[app.status]||app.status||"pending"}</span>
+      </div>
+      <div class="orderItemsList">${esc(descLine||"-")}</div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="disp" style="font-weight:700; color:var(--marigoldDeep);">${(app.sgtNeeded||0).toLocaleString("id-ID")} SGT</div>
+        ${isPending ? `
+          <div class="orderActions">
+            <button class="btnGoodSm" data-approveapp="${id}" data-appkind="${kind}" data-appuser="${esc(app.userId||'')}" data-appamount="${app.sgtNeeded||0}" data-appdesc="${esc(desc.label)}">${checkIcon} Setujui</button>
+            <button class="btnDangerSm" data-rejectapp="${id}" data-appkind="${kind}">${xIcon} Tolak</button>
+          </div>` : ""}
+      </div>
+    </div>`;
+}
+const BANSOS_JENIS_LABEL_513 = { sembako:"Sembako", kesehatan:"Kesehatan", darurat:"Darurat", tempat_tinggal:"Tempat Tinggal" };
+
+function renderAdminSgtSosial(){
+  const tabs = [
+    { id:"beasiswa", label:"Beasiswa" },
+    { id:"bansos", label:"Bantuan Sosial" },
+    { id:"staking", label:"Staking" },
+  ];
+  const tabBtns = tabs.map(t=>`<button class="${state.sosialTab===t.id?'active':''}" data-sosialtab="${t.id}">${t.label}</button>`).join("");
+
+  let body = "";
+  if(state.sosialTab==="beasiswa"){
+    if(BEASISWA_APPS_513===null) body = `<div class="sosialEmpty">Memuat pengajuan beasiswa…</div>`;
+    else if(!BEASISWA_APPS_513.length) body = `<div class="sosialEmpty">Belum ada pengajuan beasiswa</div>`;
+    else body = BEASISWA_APPS_513.map(a=>renderApplicationCard513(a.data, a.id, "beasiswa")).join("");
+  } else if(state.sosialTab==="bansos"){
+    if(BANSOS_APPS_513===null) body = `<div class="sosialEmpty">Memuat pengajuan bantuan sosial…</div>`;
+    else if(!BANSOS_APPS_513.length) body = `<div class="sosialEmpty">Belum ada pengajuan bantuan sosial</div>`;
+    else body = BANSOS_APPS_513.map(a=>renderApplicationCard513(a.data, a.id, "bansos")).join("");
+  } else if(state.sosialTab==="staking"){
+    const statCards = `
+      <div class="statsGrid" style="margin-bottom:16px;">
+        <div class="statCard"><div class="statLabel">${coinsIcon} SGT terstaking</div><div class="statValue disp">${BAITUL_MAAL_513.totalStaked.toLocaleString("id-ID")}</div></div>
+        <div class="statCard"><div class="statLabel">${heartHandIcon} Dana Baitul Maal</div><div class="statValue disp">${BAITUL_MAAL_513.dana.toLocaleString("id-ID")}</div></div>
+        <div class="statCard"><div class="statLabel">${trophyIcon} Staker aktif</div><div class="statValue disp">${BAITUL_MAAL_513.stakers}</div></div>
+      </div>`;
+    let list;
+    if(STAKING_LIST_513===null) list = `<div class="sosialEmpty">Memuat data staking…</div>`;
+    else if(!STAKING_LIST_513.length) list = `<div class="sosialEmpty">Tidak ada staking aktif</div>`;
+    else list = STAKING_LIST_513.map(s=>{
+      const end = s.endDate ? new Date(s.endDate) : null;
+      const daysLeft = end ? Math.max(0, Math.ceil((end-new Date())/86400000)) : "-";
+      return `<div class="stakingRow">
+        <div><div style="font-weight:700; font-size:13px;">@${esc(s.username||"—")}</div><div style="font-size:11px; color:#8A8368;">${s.days||"-"} hari · ${s.apy||"-"}% APY · ${daysLeft} hari lagi</div></div>
+        <div style="text-align:right;"><div class="disp" style="font-weight:700;">${(s.amount||0).toLocaleString("id-ID")} SGT</div><div style="font-size:10.5px; color:#8A8368;">Dana BM: ${s.zakat||0} SGT</div></div>
+      </div>`;
+    }).join("");
+    body = statCards + list;
+  }
+
+  return `
+    <button class="adminBackBtn" data-nav="dashboard">${backIcon} Kembali</button>
+    <div class="adminTopbar">
+      <div>
+        <div class="adminTopbarTitle disp">SGT Sosial — Beasiswa, Bansos &amp; Staking</div>
+        <div class="adminTopbarSub">Terhubung ke ledger pusat yang sama dengan Sagatama Mart. Setuju/tolak di sini langsung tersinkron.</div>
+      </div>
+    </div>
+    <section class="panel">
+      <div class="tabSosial">${tabBtns}</div>
+      ${body}
+    </section>
+  `;
+}
+
+// Helper: akses instance firebase modul dari script type="module" di bawah,
+// diekspos lewat window.__sgtDb513 / window.__fsRef513 supaya script utama
+// (non-module) ini bisa memakai Firestore tanpa duplikasi konfigurasi.
+function initFirebaseSgtRef(){
+  if(typeof window.__ensureFirebase513 === "function") window.__ensureFirebase513();
+}
+
+async function loadAdminBeasiswa513(){
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { collection, query, orderBy, getDocs } = window.__fsRef513;
+    let snap;
+    try{ snap = await getDocs(query(collection(dbRef,"beasiswa_applications"), orderBy("createdAt","desc"))); }
+    catch(e){ snap = await getDocs(collection(dbRef,"beasiswa_applications")); }
+    const arr = [];
+    snap.forEach(d=>arr.push({ id:d.id, data:d.data() }));
+    BEASISWA_APPS_513 = arr;
+  }catch(e){ console.warn("[Admin] loadAdminBeasiswa513:", e.message); BEASISWA_APPS_513 = []; }
+  render();
+}
+
+async function loadAdminBansos513(){
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { collection, query, orderBy, getDocs } = window.__fsRef513;
+    let snap;
+    try{ snap = await getDocs(query(collection(dbRef,"bansos_applications"), orderBy("createdAt","desc"))); }
+    catch(e){ snap = await getDocs(collection(dbRef,"bansos_applications")); }
+    const arr = [];
+    snap.forEach(d=>arr.push({ id:d.id, data:d.data() }));
+    BANSOS_APPS_513 = arr;
+  }catch(e){ console.warn("[Admin] loadAdminBansos513:", e.message); BANSOS_APPS_513 = []; }
+  render();
+}
+
+async function loadAdminStaking513(){
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { collection, query, where, getDoc, doc, getDocs } = window.__fsRef513;
+    const snap = await getDocs(query(collection(dbRef,"sgt_stakings"), where("status","==","active")));
+    const arr = []; let total = 0; const stakers = new Set();
+    snap.forEach(d=>{ const s=d.data(); arr.push(s); total += (s.amount||0); stakers.add(s.userId||s.firebaseUid); });
+    STAKING_LIST_513 = arr;
+    const poolSnap = await getDoc(doc(dbRef,"sgt_config","dana_pools"));
+    const dana = poolSnap.exists() ? (poolSnap.data().baitul_maal||0) : 0;
+    BAITUL_MAAL_513 = { dana, totalStaked: total, stakers: stakers.size };
+  }catch(e){ console.warn("[Admin] loadAdminStaking513:", e.message); STAKING_LIST_513 = []; }
+  render();
+}
+
+async function approveApplication513(kind, docId, userId, sgtAmount, description){
+  if(!confirm(`Setujui pengajuan ini dan kirim ${sgtAmount} SGT ke user?`)) return;
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { doc, getDoc, setDoc, updateDoc, addDoc, collection, serverTimestamp } = window.__fsRef513;
+    const collName = kind==="beasiswa" ? "beasiswa_applications" : "bansos_applications";
+    await updateDoc(doc(dbRef, collName, docId), { status:"approved", approvedAt: serverTimestamp(), approvedBy:"sagatama513_admin" });
+
+    if(userId){
+      const userRef = doc(dbRef, "users", userId);
+      const userSnap = await getDoc(userRef);
+      const currentBal = userSnap.exists() ? (userSnap.data().sgtBalance||0) : 0;
+      const currentTxs = userSnap.exists() ? (userSnap.data().sgtTransactions||[]) : [];
+      const newTx = { type:"earn", amount:sgtAmount, description, date:new Date().toISOString(), userId };
+      await setDoc(userRef, {
+        sgtBalance: currentBal + sgtAmount,
+        sgtTransactions: [newTx, ...currentTxs].slice(0,200),
+        sgtUpdatedAt: serverTimestamp()
+      }, { merge:true });
+      await addDoc(collection(dbRef,"sgt_logs"), {
+        adminId:"sagatama513_admin", targetUserId:userId, amount:sgtAmount, type:collName,
+        description, timestamp: serverTimestamp()
+      });
+    }
+    window.toast513 && window.toast513(`✅ Disetujui! ${sgtAmount} SGT dikirim ke user`, "success");
+    if(kind==="beasiswa") loadAdminBeasiswa513(); else loadAdminBansos513();
+  }catch(e){
+    window.toast513 && window.toast513("Gagal approve: "+e.message, "error");
+  }
+}
+
+async function rejectApplication513(kind, docId){
+  if(!confirm("Tolak pengajuan ini?")) return;
+  try{
+    initFirebaseSgtRef();
+    const dbRef = window.__sgtDb513;
+    const { doc, updateDoc, serverTimestamp } = window.__fsRef513;
+    const collName = kind==="beasiswa" ? "beasiswa_applications" : "bansos_applications";
+    await updateDoc(doc(dbRef, collName, docId), { status:"rejected", rejectedAt: serverTimestamp() });
+    window.toast513 && window.toast513("Pengajuan ditolak", "warning");
+    if(kind==="beasiswa") loadAdminBeasiswa513(); else loadAdminBansos513();
+  }catch(e){
+    window.toast513 && window.toast513("Gagal: "+e.message, "error");
+  }
+}
 
 function renderAdminSettings(){
   return `
@@ -1190,7 +1586,41 @@ function attachEvents(){
       state.formOpen = false;
       state.editingId = null;
       render();
+      if(state.adminView==="orders" && ORDERS_513===null) loadOrders513();
+      if(state.adminView==="sgtsosial"){
+        if(state.sosialTab==="beasiswa" && BEASISWA_APPS_513===null) loadAdminBeasiswa513();
+        if(state.sosialTab==="bansos" && BANSOS_APPS_513===null) loadAdminBansos513();
+        if(state.sosialTab==="staking" && STAKING_LIST_513===null) loadAdminStaking513();
+      }
     });
+  });
+
+  // ---- Kelola Pesanan (Orders) ----
+  document.querySelectorAll("[data-orderfilter]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ state.ordersFilter = btn.dataset.orderfilter; render(); });
+  });
+  document.querySelectorAll("[data-orderadvance]").forEach(btn=>{
+    btn.addEventListener("click", ()=> advanceOrderStatus513(btn.dataset.orderadvance, btn.dataset.nextstatus));
+  });
+  document.querySelectorAll("[data-ordercancel]").forEach(btn=>{
+    btn.addEventListener("click", ()=> cancelOrder513(btn.dataset.ordercancel));
+  });
+
+  // ---- SGT Sosial (Admin): tab switch + approve/reject ----
+  document.querySelectorAll("[data-sosialtab]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.sosialTab = btn.dataset.sosialtab;
+      render();
+      if(state.sosialTab==="beasiswa" && BEASISWA_APPS_513===null) loadAdminBeasiswa513();
+      if(state.sosialTab==="bansos" && BANSOS_APPS_513===null) loadAdminBansos513();
+      if(state.sosialTab==="staking") loadAdminStaking513();
+    });
+  });
+  document.querySelectorAll("[data-approveapp]").forEach(btn=>{
+    btn.addEventListener("click", ()=> approveApplication513(btn.dataset.appkind, btn.dataset.approveapp, btn.dataset.appuser, Number(btn.dataset.appamount), btn.dataset.appdesc));
+  });
+  document.querySelectorAll("[data-rejectapp]").forEach(btn=>{
+    btn.addEventListener("click", ()=> rejectApplication513(btn.dataset.appkind, btn.dataset.rejectapp));
   });
   document.getElementById("btnAdminLogout")?.addEventListener("click", ()=>{
     state.adminLoggedIn = false;
@@ -1231,34 +1661,24 @@ function attachEvents(){
     render();
     const el = document.getElementById("rpInput"); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
   });
-  // 🔧 FIX: dulu tiap keystroke di sini manggil render() -> hancurkan &
-  // bangun ulang SELURUH halaman admin + re-bind semua event listener dari
-  // nol. Dengan banyak produk di tabel, ini bikin klik ke tombol lain
-  // (mis. tab "Kelola Produk", tombol Simpan) kadang jatuh ke elemen DOM
-  // yang baru saja dihapus saat render ulang lagi berlangsung -> tombol
-  // terasa "kadang bisa kadang tidak". Sekarang: cukup update data di
-  // memori PRODUCTS + sel yang bergantung (kolom Rupiah), TANPA render()
-  // ulang seluruh halaman. Baru render() penuh dipanggil saat form
-  // Simpan/Batal/Tambah/Hapus produk ditekan (perubahan struktur nyata).
   document.querySelectorAll("td.piInput input").forEach(inp=>{
     inp.addEventListener("input", e=>{
       const id = Number(inp.dataset.id);
       const val = Math.max(0, Number(e.target.value)||0);
-      const prod = PRODUCTS.find(p=>p.id===id);
-      if(prod) prod.pi = val;
-      const row = inp.closest("tr");
-      const rpCell = row?.querySelector("td.rp");
-      if(rpCell) rpCell.textContent = formatRp(val*state.rate);
+      PRODUCTS = PRODUCTS.map(p => p.id===id ? {...p, pi:val} : p);
+      render();
+      const el = document.querySelector(`td.piInput input[data-id="${id}"]`);
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     });
   });
   document.querySelectorAll("td.stockInput input").forEach(inp=>{
     inp.addEventListener("input", e=>{
       const id = Number(inp.dataset.stockid);
       const val = Math.max(0, Math.round(Number(e.target.value)||0));
-      const prod = PRODUCTS.find(p=>p.id===id);
-      if(prod) prod.stock = val;
-      // Tidak ada kolom lain di tabel ini yang bergantung pada stok,
-      // jadi cukup update data di memori tanpa sentuh DOM lain.
+      PRODUCTS = PRODUCTS.map(p => p.id===id ? {...p, stock:val} : p);
+      render();
+      const el = document.querySelector(`td.stockInput input[data-stockid="${id}"]`);
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     });
   });
   document.querySelectorAll("[data-editid]").forEach(btn=>{
@@ -1425,7 +1845,7 @@ render();
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 // SGT adalah token bersama satu ledger dengan Sagatama Mart, jadi saldo &
@@ -1728,7 +2148,237 @@ window.sagatama513AdminLoginHook = async function () {
     await ensureAdminFirebaseAuth513();
     await loadSgtConfig513();
     if (typeof window.render === 'function') window.render();
+    // Prefetch data pesanan & pengajuan sosial di background supaya badge
+    // notifikasi di sidebar admin langsung terisi tanpa perlu buka menunya.
+    if (typeof window.loadOrders513 === 'function') window.loadOrders513();
+    if (typeof window.loadAdminBeasiswa513 === 'function') window.loadAdminBeasiswa513();
+    if (typeof window.loadAdminBansos513 === 'function') window.loadAdminBansos513();
 };
+
+// Jembatan Firestore untuk fungsi admin (Orders, SGT Sosial) yang didefinisikan
+// di <script> non-module utama — supaya tidak duplikasi konfigurasi Firebase.
+window.__ensureFirebase513 = function(){ initFirebaseSgt(); window.__sgtDb513 = db; };
+window.__fsRef513 = { doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, getDocs, limit, serverTimestamp };
+
+// ===========================================================================
+// SGT SOSIAL (User) — Ajukan Beasiswa / Bantuan Sosial / Staking dari
+// Sagatama-513. Ditulis ke koleksi Firestore yang SAMA dengan Sagatama Mart
+// (beasiswa_applications, bansos_applications, sgt_stakings) sehingga masuk
+// ke antrian approval admin pusat yang sama.
+// ===========================================================================
+const BEASISWA_SGT_513 = { sd:200, smp:350, sma:500, pt:1000 };
+const BANSOS_SGT_513 = { sembako:300, kesehatan:500, darurat:1000, tempat_tinggal:750 };
+let sosialTabActive513 = "beasiswa";
+let stakingSelDays513 = 0, stakingSelApy513 = 0;
+
+function esc513(s){ const d=document.createElement("div"); d.textContent = s==null?"":String(s); return d.innerHTML; }
+
+async function ensureAnonAuthForSosial513(){
+    initFirebaseSgt();
+    if (auth && !auth.currentUser) { try { await signInAnonymously(auth); } catch(e){} }
+}
+
+function renderSosialForm513(tab){
+    const body = document.getElementById("sosialBody513");
+    if (!body) return;
+    if (!sgtCurrentUser) {
+        body.innerHTML = `<div style="text-align:center;padding:20px 10px;color:#6B6553;font-size:13px;">Masuk dengan Pi terlebih dahulu untuk mengajukan.</div>`;
+        return;
+    }
+    if (tab === "beasiswa") {
+        body.innerHTML = `
+          <div id="sosialStatus513" style="margin-bottom:12px;"></div>
+          <label style="font-size:12px;font-weight:600;">Nama lengkap</label>
+          <input id="bsNama513" type="text" placeholder="Nama sesuai identitas" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;" />
+          <label style="font-size:12px;font-weight:600;">Tingkat pendidikan</label>
+          <select id="bsTingkat513" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;">
+            <option value="">Pilih tingkat</option>
+            <option value="sd">SD (200 SGT)</option>
+            <option value="smp">SMP (350 SGT)</option>
+            <option value="sma">SMA/SMK (500 SGT)</option>
+            <option value="pt">Perguruan Tinggi (1000 SGT)</option>
+          </select>
+          <label style="font-size:12px;font-weight:600;">Nama sekolah/kampus</label>
+          <input id="bsSekolah513" type="text" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;" />
+          <label style="font-size:12px;font-weight:600;">Alasan pengajuan</label>
+          <textarea id="bsAlasan513" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 12px;font-family:inherit;"></textarea>
+          <button id="btnSubmitBeasiswa513" style="width:100%;background:var(--accentGrad);color:#211605;border:none;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;">Kirim Pengajuan</button>
+        `;
+        loadUserAppStatus513("beasiswa_applications", "sosialStatus513");
+    } else if (tab === "bansos") {
+        body.innerHTML = `
+          <div id="sosialStatus513" style="margin-bottom:12px;"></div>
+          <label style="font-size:12px;font-weight:600;">Nama lengkap</label>
+          <input id="bnNama513" type="text" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;" />
+          <label style="font-size:12px;font-weight:600;">Jenis bantuan</label>
+          <select id="bnJenis513" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;">
+            <option value="">Pilih jenis</option>
+            <option value="sembako">Sembako (300 SGT)</option>
+            <option value="kesehatan">Kesehatan (500 SGT)</option>
+            <option value="darurat">Darurat/Musibah (1000 SGT)</option>
+            <option value="tempat_tinggal">Tempat Tinggal (750 SGT)</option>
+          </select>
+          <label style="font-size:12px;font-weight:600;">Nomor telepon (opsional)</label>
+          <input id="bnTelp513" type="text" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;" />
+          <label style="font-size:12px;font-weight:600;">Deskripsi kebutuhan</label>
+          <textarea id="bnDeskripsi513" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 12px;font-family:inherit;"></textarea>
+          <button id="btnSubmitBansos513" style="width:100%;background:var(--accentGrad);color:#211605;border:none;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;">Kirim Pengajuan</button>
+        `;
+        loadUserAppStatus513("bansos_applications", "sosialStatus513");
+    } else if (tab === "staking") {
+        body.innerHTML = `
+          <div id="sosialStatus513" style="margin-bottom:12px;font-size:12px;color:#6B6553;">Saldo SGT-mu: <strong>${(sgtBalance||0).toLocaleString('id-ID')} SGT</strong>. APY reward didanai dari fee pool transaksi, bukan cetak token baru.</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+            <button class="stakeOptBtn513" data-days="30" data-apy="8" style="text-align:left;padding:12px;border-radius:10px;border:1.5px solid var(--line);background:var(--white);cursor:pointer;font-family:inherit;">🔐 Lock 30 hari — <strong>8% APY</strong></button>
+            <button class="stakeOptBtn513" data-days="90" data-apy="14" style="text-align:left;padding:12px;border-radius:10px;border:1.5px solid var(--line);background:var(--white);cursor:pointer;font-family:inherit;">🔐 Lock 90 hari — <strong>14% APY</strong></button>
+            <button class="stakeOptBtn513" data-days="180" data-apy="20" style="text-align:left;padding:12px;border-radius:10px;border:1.5px solid var(--line);background:var(--white);cursor:pointer;font-family:inherit;">🔐 Lock 180 hari — <strong>20% APY</strong></button>
+          </div>
+          <div id="stakeInputArea513" style="display:none;">
+            <label style="font-size:12px;font-weight:600;" id="stakeSelLabel513"></label>
+            <input id="stakeAmount513" type="number" min="100" placeholder="Min. 100 SGT" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);margin:6px 0 10px;font-family:inherit;" />
+            <button id="btnSubmitStaking513" style="width:100%;background:var(--accentGrad);color:#211605;border:none;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;">Mulai Staking</button>
+          </div>
+          <div id="stakeActiveList513" style="margin-top:16px;"></div>
+        `;
+        loadUserStakingList513();
+    }
+}
+
+async function loadUserAppStatus513(collName, targetId){
+    const el = document.getElementById(targetId);
+    if (!el || !sgtCurrentUser || !db) return;
+    try {
+        const snap = await getDocs(query(collection(db, collName), where("userId","==",sgtCurrentUser.uid)));
+        if (snap.empty) { el.innerHTML = `<div style="font-size:12px;color:#8A8368;">Belum ada pengajuan sebelumnya.</div>`; return; }
+        const statusLabel = { pending:"Menunggu Verifikasi", approved:"Disetujui", rejected:"Ditolak" };
+        let html = "";
+        snap.forEach(d=>{
+            const s = d.data();
+            html += `<div style="background:var(--paperDim);border-radius:10px;padding:10px;margin-bottom:6px;font-size:12px;"><strong>${esc513(s.nama)}</strong> — ${statusLabel[s.status]||s.status} <span style="float:right;color:var(--marigoldDeep);font-weight:700;">${s.sgtNeeded} SGT</span></div>`;
+        });
+        el.innerHTML = html;
+    } catch(e){ el.innerHTML = `<div style="font-size:11.5px;color:var(--danger);">Gagal memuat status: ${e.message}</div>`; }
+}
+
+async function loadUserStakingList513(){
+    const el = document.getElementById("stakeActiveList513");
+    if (!el || !sgtCurrentUser || !db) return;
+    try {
+        const snap = await getDocs(query(collection(db,"sgt_stakings"), where("userId","==",sgtCurrentUser.uid), where("status","==","active")));
+        if (snap.empty) { el.innerHTML = `<div style="font-size:12px;color:#8A8368;">Belum ada staking aktif.</div>`; return; }
+        let html = "";
+        snap.forEach(d=>{
+            const s = d.data();
+            html += `<div style="background:var(--paperDim);border-radius:10px;padding:10px;margin-bottom:6px;font-size:12px;">${s.days} hari · ${s.apy}% APY — <strong>${(s.amount||0).toLocaleString('id-ID')} SGT</strong> <span style="float:right;color:var(--good);font-weight:700;">+${s.netReward||0} SGT</span></div>`;
+        });
+        el.innerHTML = html;
+    } catch(e){ el.innerHTML = `<div style="font-size:11.5px;color:var(--danger);">${e.message}</div>`; }
+}
+
+async function submitBeasiswaUser513(){
+    const nama = document.getElementById("bsNama513")?.value.trim();
+    const tingkat = document.getElementById("bsTingkat513")?.value;
+    const sekolah = document.getElementById("bsSekolah513")?.value.trim();
+    const alasan = document.getElementById("bsAlasan513")?.value.trim();
+    if (!nama || !tingkat || !sekolah || !alasan) { window.toast513 && window.toast513("Lengkapi semua data", "error"); return; }
+    try {
+        initFirebaseSgt();
+        await ensureAnonAuthForSosial513();
+        await addDoc(collection(db,"beasiswa_applications"), {
+            userId: sgtCurrentUser.uid, username: sgtCurrentUser.username,
+            nama, tingkat, sekolah, alasan,
+            sgtNeeded: BEASISWA_SGT_513[tingkat]||200,
+            status:"pending", source:"sagatama-513", createdAt: serverTimestamp()
+        });
+        window.toast513 && window.toast513("✅ Pengajuan beasiswa terkirim!", "success");
+        renderSosialForm513("beasiswa");
+    } catch(e){ window.toast513 && window.toast513("Gagal kirim: "+e.message, "error"); }
+}
+
+async function submitBansosUser513(){
+    const nama = document.getElementById("bnNama513")?.value.trim();
+    const jenis = document.getElementById("bnJenis513")?.value;
+    const telp = document.getElementById("bnTelp513")?.value.trim();
+    const deskripsi = document.getElementById("bnDeskripsi513")?.value.trim();
+    if (!nama || !jenis || !deskripsi) { window.toast513 && window.toast513("Lengkapi semua data", "error"); return; }
+    try {
+        initFirebaseSgt();
+        await ensureAnonAuthForSosial513();
+        await addDoc(collection(db,"bansos_applications"), {
+            userId: sgtCurrentUser.uid, username: sgtCurrentUser.username,
+            nama, jenis, telp: telp||"-", deskripsi,
+            sgtNeeded: BANSOS_SGT_513[jenis]||300,
+            status:"pending", source:"sagatama-513", createdAt: serverTimestamp()
+        });
+        window.toast513 && window.toast513("✅ Pengajuan bantuan sosial terkirim!", "success");
+        renderSosialForm513("bansos");
+    } catch(e){ window.toast513 && window.toast513("Gagal kirim: "+e.message, "error"); }
+}
+
+async function submitStakingUser513(){
+    const amt = parseInt(document.getElementById("stakeAmount513")?.value);
+    if (!amt || amt < 100) { window.toast513 && window.toast513("Minimum staking 100 SGT", "error"); return; }
+    if (amt > (sgtBalance||0)) { window.toast513 && window.toast513("Saldo SGT tidak cukup", "error"); return; }
+    if (!stakingSelDays513) { window.toast513 && window.toast513("Pilih paket staking dahulu", "error"); return; }
+    try {
+        initFirebaseSgt();
+        await ensureAnonAuthForSosial513();
+        const start = new Date();
+        const end = new Date(start.getTime() + stakingSelDays513*86400000);
+        const grossReward = Math.floor(amt*(stakingSelApy513/100)*(stakingSelDays513/365));
+        const zakat = Math.floor(grossReward*0.10);
+        const netReward = grossReward - zakat;
+        await addDoc(collection(db,"sgt_stakings"), {
+            userId: sgtCurrentUser.uid, username: sgtCurrentUser.username,
+            amount: amt, days: stakingSelDays513, apy: stakingSelApy513,
+            startDate: start.toISOString(), endDate: end.toISOString(),
+            reward: grossReward, zakat, netReward,
+            status:"active", source:"sagatama-513", createdAt: serverTimestamp()
+        });
+        // Catatan: pengurangan saldo SGT riil sebaiknya lewat backend (sama
+        // seperti checkout) — di sini staking dicatat, verifikasi saldo
+        // akhir tetap ke ledger pusat lewat /api/sgt/sync bila tersedia.
+        window.toast513 && window.toast513(`✅ ${amt} SGT berhasil di-staking! Estimasi reward: +${netReward} SGT`, "success");
+        document.getElementById("stakeAmount513").value = "";
+        loadUserStakingList513();
+    } catch(e){ window.toast513 && window.toast513("Gagal staking: "+e.message, "error"); }
+}
+
+document.getElementById("btnOpenSosial513")?.addEventListener("click", ()=>{
+    document.getElementById("walletOverlay")?.classList.remove("open");
+    document.getElementById("sosialOverlay")?.classList.add("open");
+    renderSosialForm513(sosialTabActive513);
+});
+document.getElementById("sosialClose")?.addEventListener("click", ()=>{
+    document.getElementById("sosialOverlay")?.classList.remove("open");
+});
+document.getElementById("sosialOverlay")?.addEventListener("click", (e)=>{
+    if (e.target.id === "sosialOverlay") e.currentTarget.classList.remove("open");
+});
+["sosialTabBeasiswa","sosialTabBansos","sosialTabStaking"].forEach(id=>{
+    document.getElementById(id)?.addEventListener("click", (e)=>{
+        document.querySelectorAll("#sosialOverlay .tabSosial button").forEach(b=>b.classList.remove("active"));
+        e.currentTarget.classList.add("active");
+        sosialTabActive513 = e.currentTarget.dataset.usosial;
+        renderSosialForm513(sosialTabActive513);
+    });
+});
+// Delegasi event untuk tombol yang dibuat dinamis di dalam #sosialBody513
+document.getElementById("sosialBody513")?.addEventListener("click", (e)=>{
+    const stakeOpt = e.target.closest(".stakeOptBtn513");
+    if (stakeOpt) {
+        stakingSelDays513 = parseInt(stakeOpt.dataset.days);
+        stakingSelApy513 = parseInt(stakeOpt.dataset.apy);
+        const area = document.getElementById("stakeInputArea513");
+        if (area) area.style.display = "block";
+        const lbl = document.getElementById("stakeSelLabel513");
+        if (lbl) lbl.textContent = `Paket ${stakingSelDays513} hari • ${stakingSelApy513}% APY — jumlah SGT:`;
+        return;
+    }
+    if (e.target.id === "btnSubmitBeasiswa513") submitBeasiswaUser513();
+    if (e.target.id === "btnSubmitBansos513") submitBansosUser513();
+    if (e.target.id === "btnSubmitStaking513") submitStakingUser513();
+});
 
 // Simpan rate mint — nulis ke sgt_config/supply, dokumen & field SAMA
 // dengan yang dibaca Sagatama Mart, jadi rate berlaku untuk keduanya.
