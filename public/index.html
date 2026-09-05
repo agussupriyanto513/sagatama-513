@@ -1256,6 +1256,7 @@ function attachEvents(){
       state.formOpen = false;
       const prod = PRODUCTS.find(x=>x.id===state.editingId);
       state.formImage = prod?.image || null;
+      state.formImageChanged = false;
       render();
       document.querySelector(".formPanel")?.scrollIntoView({behavior:"smooth", block:"center"});
     });
@@ -1268,6 +1269,7 @@ function attachEvents(){
         PRODUCTS = PRODUCTS.filter(x=>x.id!==id);
         if(state.editingId===id){ state.editingId=null; }
         render();
+        window.SgtProducts?.deleteProductFromFirestore(id).catch(e=>console.warn("Gagal hapus produk di server:", e.message));
       }
     });
   });
@@ -1277,6 +1279,7 @@ function attachEvents(){
       state.formOpen = true;
       state.editingId = null;
       state.formImage = null;
+      state.formImageChanged = false;
       render();
       document.querySelector(".formPanel")?.scrollIntoView({behavior:"smooth", block:"center"});
     });
@@ -1287,6 +1290,7 @@ function attachEvents(){
       state.formOpen = false;
       state.editingId = null;
       state.formImage = null;
+      state.formImageChanged = false;
       render();
     });
   }
@@ -1299,7 +1303,8 @@ function attachEvents(){
         if(!file) return;
         if(!file.type.startsWith("image/")){ alert("File harus berupa gambar."); return; }
         compressImageFile(file, 640, 640, 0.82).then(dataUrl=>{
-          state.formImage = dataUrl;
+          state.formImage = dataUrl; // data URL dipakai utk preview & ditandai "belum diupload"
+          state.formImageChanged = true;
           refreshPhotoBlock();
         }).catch(()=>{ alert("Gagal memproses foto. Coba file lain."); });
       });
@@ -1308,6 +1313,7 @@ function attachEvents(){
     if(removeBtn){
       removeBtn.addEventListener("click", ()=>{
         state.formImage = null;
+        state.formImageChanged = true;
         refreshPhotoBlock();
       });
     }
@@ -1322,24 +1328,60 @@ function attachEvents(){
   if(photoInput) bindPhotoUpload();
   const saveBtn = document.getElementById("btnSaveProduct");
   if(saveBtn){
-    saveBtn.addEventListener("click", ()=>{
+    saveBtn.addEventListener("click", async ()=>{
       const name = document.getElementById("fName").value.trim();
       const cat = document.getElementById("fCat").value.trim() || "Lainnya";
       const icon = document.getElementById("fIcon").value;
       const pi = Math.max(0, Number(document.getElementById("fPi").value)||0);
       const stock = Math.max(0, Math.round(Number(document.getElementById("fStock").value)||0));
       const premium = document.getElementById("fPremium").checked;
-      const image = state.formImage || null;
       if(!name){ alert("Nama produk wajib diisi."); return; }
 
-      if(state.editingId){
-        PRODUCTS = PRODUCTS.map(p => p.id===state.editingId ? {...p, name, cat, icon, pi, stock, premium, image} : p);
-      } else {
-        PRODUCTS.push({ id:nextId++, name, cat, icon, pi, stock, premium, image, sold:0 });
+      const id = state.editingId || nextId;
+      let image = state.formImage || null;
+
+      const origLabel = saveBtn.textContent;
+      saveBtn.disabled = true;
+
+      // Kalau foto baru dipilih (masih data URL, belum diupload), upload ke
+      // Firebase Storage dulu dan pakai URL hasil uploadnya.
+      if(state.formImageChanged && image && image.startsWith("data:")){
+        saveBtn.textContent = "Mengunggah foto...";
+        try{
+          const blob = await (await fetch(image)).blob();
+          image = await window.SgtProducts.uploadProductImage(id, blob);
+        }catch(e){
+          alert("Gagal mengunggah foto ke server: " + e.message + "\nProduk tidak disimpan, coba lagi.");
+          saveBtn.disabled = false;
+          saveBtn.textContent = origLabel;
+          return;
+        }
       }
+
+      const productData = { id, name, cat, icon, pi, stock, premium, image, sold: 0 };
+
+      if(state.editingId){
+        const prev = PRODUCTS.find(p=>p.id===state.editingId);
+        productData.sold = prev?.sold || 0;
+        PRODUCTS = PRODUCTS.map(p => p.id===state.editingId ? {...p, ...productData} : p);
+      } else {
+        PRODUCTS.push(productData);
+        nextId++;
+      }
+
+      saveBtn.textContent = "Menyimpan...";
+      try{
+        await window.SgtProducts.saveProductToFirestore(productData);
+      }catch(e){
+        alert("Foto & data lokal sudah tersimpan sementara, tapi gagal ditulis ke database (" + e.message + "). Bisa hilang saat refresh — coba simpan ulang.");
+      }
+
+      saveBtn.disabled = false;
+      saveBtn.textContent = origLabel;
       state.formOpen = false;
       state.editingId = null;
       state.formImage = null;
+      state.formImageChanged = false;
       render();
     });
   }
@@ -1354,6 +1396,7 @@ document.getElementById("bnAdmin").addEventListener("click", ()=>{ document.getE
 document.getElementById("bnCart").addEventListener("click", ()=>{ document.getElementById("cartIconBtn").click(); });
 document.getElementById("bnWallet").addEventListener("click", ()=>{ document.getElementById("sgtBadge").click(); });
 
+window.render = render; // supaya modul Firebase bisa trigger re-render setelah data async selesai
 render();
 </script>
 
@@ -1371,7 +1414,8 @@ render();
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, getDocs, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 // SGT adalah token bersama satu ledger dengan Sagatama Mart, jadi saldo &
 // sync SGT tetap manggil backend Mart.
@@ -1394,7 +1438,7 @@ const firebaseConfig = {
 
 const USE_SANDBOX = false; // MAINNET — app dev mainnet baru
 
-let app, auth, db;
+let app, auth, db, storage;
 let sgtCurrentUser = null;
 let sgtBalance = 0;
 let isPiSDKReady = false;
@@ -1405,10 +1449,67 @@ function initFirebaseSgt() {
         if (!app) app = initializeApp(firebaseConfig);
         if (!auth) auth = getAuth(app);
         if (!db) db = initializeFirestore(app, { experimentalForceLongPolling: true, useFetchStreams: false });
+        if (!storage) storage = getStorage(app);
     } catch (e) {
         console.warn('[SGT] Firebase init gagal:', e.message);
     }
 }
+
+// ---------------------------------------------------------------------------
+// PERSISTENSI KATALOG PRODUK (Firestore collection 'products' + Storage
+// folder 'products/'). Sebelum ini PRODUCTS cuma variabel di memori browser
+// dan foto disimpan sebagai data URL sementara — jadi hilang tiap refresh.
+// Sekarang: foto diupload ke Storage, datanya (termasuk URL foto) ditulis
+// ke Firestore, dan saat halaman dibuka ulang data ini di-load & digabung
+// ke katalog demo lokal (id yang sama akan ditimpa oleh data Firestore).
+// ---------------------------------------------------------------------------
+async function loadProductsFromFirestore() {
+    try {
+        initFirebaseSgt();
+        const snap = await getDocs(collection(db, 'products'));
+        if (!snap.empty) {
+            const remoteMap = {};
+            snap.forEach(d => { remoteMap[d.id] = { id: Number(d.id), ...d.data() }; });
+            const localIds = new Set(PRODUCTS.map(p => p.id));
+            PRODUCTS = PRODUCTS.map(p => remoteMap[p.id] ? remoteMap[p.id] : p);
+            Object.keys(remoteMap).forEach(idStr => {
+                const id = Number(idStr);
+                if (!localIds.has(id)) PRODUCTS.push(remoteMap[idStr]);
+            });
+            PRODUCTS.sort((a, b) => a.id - b.id);
+            nextId = Math.max(nextId, ...PRODUCTS.map(p => p.id)) + 1;
+        }
+    } catch (e) {
+        console.warn('[SGT] Gagal memuat produk dari Firestore:', e.message);
+    } finally {
+        if (typeof window.render === 'function') window.render();
+    }
+}
+
+async function uploadProductImage(id, blobOrFile) {
+    initFirebaseSgt();
+    const path = `products/${id}.jpg`;
+    const sRef = storageRef(storage, path);
+    await uploadBytes(sRef, blobOrFile, { contentType: 'image/jpeg' });
+    return await getDownloadURL(sRef);
+}
+
+async function saveProductToFirestore(product) {
+    initFirebaseSgt();
+    const { id, ...data } = product;
+    await setDoc(doc(db, 'products', String(id)), data);
+}
+
+async function deleteProductFromFirestore(id) {
+    initFirebaseSgt();
+    try { await deleteDoc(doc(db, 'products', String(id))); } catch (e) { console.warn('[SGT] Gagal hapus produk di Firestore:', e.message); }
+    try {
+        if (!storage) storage = getStorage(app);
+        await deleteObject(storageRef(storage, `products/${id}.jpg`));
+    } catch (e) { /* wajar jika produk memang tidak punya foto */ }
+}
+
+window.SgtProducts = { loadProductsFromFirestore, uploadProductImage, saveProductToFirestore, deleteProductFromFirestore };
 
 async function initPiSDKSgt() {
     if (piInitPromise) return piInitPromise;
@@ -1873,6 +1974,7 @@ document.getElementById('walletOverlay').addEventListener('click', (e) => {
 
 (async function bootSgtConnection() {
     initFirebaseSgt();
+    loadProductsFromFirestore(); // jalan paralel, re-render otomatis saat selesai
     if (restoreExistingSession()) {
         await loadSgtBalanceFromLedger();
     }
