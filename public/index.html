@@ -337,10 +337,6 @@
         <div class="brandSub">Dari kebutuhan harian sampai barang mewah, dibayar penuh dengan Pi</div>
       </div>
     </div>
-    <nav class="tabs" id="tabs">
-      <button id="tabToko" class="active">Toko</button>
-      <button id="tabAdmin">Admin</button>
-    </nav>
     <div style="display:flex; align-items:center; gap:8px;">
       <button id="sgtBadge" class="sgtBadge"><span class="sgtDot"></span><span id="sgtBadgeLabel">0 SGT</span></button>
       <button id="btnPiLogin" class="btnPiLogin">Masuk dengan Pi</button>
@@ -680,8 +676,6 @@ function renderLogo(){
 }
 
 function render(){
-  document.getElementById("tabToko").classList.toggle("active", state.view==="toko");
-  document.getElementById("tabAdmin").classList.toggle("active", state.view==="admin");
   document.getElementById("bnToko")?.classList.toggle("active", state.view==="toko");
   document.getElementById("bnAdmin")?.classList.toggle("active", state.view==="admin");
   // Sembunyikan menu bawah saat di dalam dashboard admin — sidebar admin
@@ -1818,12 +1812,9 @@ function attachEvents(){
   }
 }
 
-document.getElementById("tabToko").addEventListener("click", ()=>{ state.view="toko"; render(); });
-document.getElementById("tabAdmin").addEventListener("click", ()=>{ state.view="admin"; render(); });
-
-// ---- Bottom mobile nav: proxy taps ke tombol header yang sudah ada ----
-document.getElementById("bnToko").addEventListener("click", ()=>{ document.getElementById("tabToko").click(); });
-document.getElementById("bnAdmin").addEventListener("click", ()=>{ document.getElementById("tabAdmin").click(); });
+// ---- Bottom mobile nav: sekarang jadi satu-satunya navigasi Toko/Admin ----
+document.getElementById("bnToko").addEventListener("click", ()=>{ state.view="toko"; render(); });
+document.getElementById("bnAdmin").addEventListener("click", ()=>{ state.view="admin"; render(); });
 document.getElementById("bnCart").addEventListener("click", ()=>{ document.getElementById("cartIconBtn").click(); });
 document.getElementById("bnWallet").addEventListener("click", ()=>{ document.getElementById("sgtBadge").click(); });
 
